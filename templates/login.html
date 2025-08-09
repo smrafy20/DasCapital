@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Login - DashCapital{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 400px; margin: 3rem auto;">
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 style="color: #667eea; font-size: 2.5rem; margin-bottom: 0.5rem;">DashCapital</h1>
+        <p style="color: #666;">Rapid Financial Transactions</p>
+    </div>
+    
+    <h2 style="text-align: center; margin-bottom: 2rem; color: #333;">Welcome Back</h2>
+    
+    <form method="POST">
+        <div class="form-group">
+            <label for="phone_number">Phone Number</label>
+            <input type="tel" id="phone_number" name="phone_number" required 
+                   placeholder="+8801XXXXXXXXX">
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required 
+                   placeholder="Enter your password">
+        </div>
+        
+        <button type="submit" class="btn" style="width: 100%; margin-top: 1rem;">
+            Login
+        </button>
+    </form>
+    
+    <div style="text-align: center; margin-top: 2rem;">
+        <p>Don't have an account? <a href="{{ url_for('register') }}" style="color: #667eea;">Register here</a></p>
+    </div>
+</div>
+{% endblock %}

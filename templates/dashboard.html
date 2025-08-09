@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - DashCapital{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+    <!-- Balance Display -->
+    <div class="balance-display">
+        <h3 style="margin-bottom: 0.5rem;">Current Balance</h3>
+        <div class="balance-amount">৳{{ "%.2f"|format(user.balance) }}</div>
+        <p style="margin-top: 0.5rem; opacity: 0.9;">
+            Account Type: {{ user.user_type.title() }} User
+        </p>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="card" style="padding: 1.5rem;">
+        <h3 style="margin-bottom: 1rem; color: #333;">Quick Actions</h3>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <a href="{{ url_for('send_request') }}" class="btn">Send Money Request</a>
+        </div>
+    </div>
+</div>
+
+<!-- Pending Requests Notification -->
+<div id="pending-requests-container" style="{% if not pending_requests %}display: none;{% endif %}">
+    <div class="card" style="background: #fff3cd; border: 1px solid #ffeaa7; margin-bottom: 2rem;">
+        {% if pending_requests %}
+        <h3 style="color: #856404; margin-bottom: 1rem;">
+            💰 You have {{ pending_requests|length }} pending money request(s)
+        </h3>
+
+        {% for request in pending_requests %}
+        <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #e9ecef;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h4 style="margin: 0; color: #333;">{{ request.sender.name }}</h4>
+                    <p style="margin: 0.25rem 0; color: #666;">{{ request.sender.phone_number }}</p>
+                    <p style="margin: 0.25rem 0; font-weight: bold; color: #28a745;">Amount: ৳{{ "%.2f"|format(request.amount) }}</p>
+                    {% if request.note %}
+                    <p style="margin: 0.25rem 0; color: #666; font-style: italic;">"{{ request.note }}"</p>
+                    {% endif %}
+                    <small style="color: #999;">{{ request.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button onclick="processRequest({{ request.id }}, 'accept')" class="btn" style="padding: 8px 16px;">
+                        Accept
+                    </button>
+                    <button onclick="processRequest({{ request.id }}, 'reject')" class="btn btn-danger" style="padding: 8px 16px;">
+                        Reject
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+    <!-- Sent Requests -->
+    <div class="card">
+        <h3 style="margin-bottom: 1rem; color: #333;">Recent Sent Requests</h3>
+        <div id="sent-requests-list">
+            {% if sent_requests %}
+                {% for request in sent_requests %}
+                <div style="padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+                    <div>
+                        <h5 style="margin: 0; color: #333;">{{ request.recipient.name }}</h5>
+                        <p style="margin: 0.25rem 0; color: #666;">৳{{ "%.2f"|format(request.amount) }}</p>
+                        <small style="color: #999;">{{ request.created_at.strftime('%b %d, %Y') }}</small>
+                    </div>
+                    <div>
+                        <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;
+                                     background: {% if request.status == 'pending' %}#fff3cd; color: #856404;
+                                               {% elif request.status == 'accepted' %}#d4edda; color: #155724;
+                                               {% else %}#f8d7da; color: #721c24;{% endif %}">
+                            {{ request.status.title() }}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: #666; text-align: center; padding: 2rem;">No sent requests yet</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Recent Transactions -->
+    <div class="card">
+        <h3 style="margin-bottom: 1rem; color: #333;">Recent Transactions</h3>
+        <div id="recent-transactions-list">
+            {% if recent_transactions %}
+                {% for transaction in recent_transactions %}
+                <div style="padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+                    <div>
+                        <h5 style="margin: 0; color: #333;">{{ transaction.description }}</h5>
+                        <small style="color: #999;">{{ transaction.created_at.strftime('%b %d, %Y at %I:%M %p') }}</small>
+                    </div>
+                    <div style="font-weight: bold;
+                               color: {% if transaction.transaction_type == 'credit' %}#28a745{% else %}#dc3545{% endif %}">
+                        {% if transaction.transaction_type == 'credit' %}+{% else %}-{% endif %}৳{{ "%.2f"|format(transaction.amount) }}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: #666; text-align: center; padding: 2rem;">No transactions yet</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let updateInterval;
+
+// Start auto-refresh when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    startAutoRefresh();
+});
+
+function startAutoRefresh() {
+    // Refresh every 5 seconds to reduce database pressure
+    updateInterval = setInterval(refreshDashboard, 5000);
+}
+
+function stopAutoRefresh() {
+    if (updateInterval) {
+        clearInterval(updateInterval);
+    }
+}
+
+function refreshDashboard() {
+    fetch('/dashboard_data')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateBalance(data.balance);
+                updatePendingRequests(data.pending_requests);
+                updateSentRequests(data.sent_requests);
+                updateRecentTransactions(data.recent_transactions);
+            }
+        })
+        .catch(error => {
+            console.error('Error refreshing dashboard:', error);
+        });
+}
+
+function updateBalance(balance) {
+    const balanceElement = document.querySelector('.balance-amount');
+    if (balanceElement) {
+        balanceElement.textContent = `৳${parseFloat(balance).toFixed(2)}`;
+    }
+}
+
+function updatePendingRequests(requests) {
+    const container = document.getElementById('pending-requests-container');
+    if (!container) return;
+
+    if (requests.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    const requestsHtml = requests.map(request => `
+        <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #e9ecef;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h4 style="margin: 0; color: #333;">${request.sender_name}</h4>
+                    <p style="margin: 0.25rem 0; color: #666;">${request.sender_phone}</p>
+                    <p style="margin: 0.25rem 0; font-weight: bold; color: #28a745;">Amount: ৳${parseFloat(request.amount).toFixed(2)}</p>
+                    ${request.note ? `<p style="margin: 0.25rem 0; color: #666; font-style: italic;">"${request.note}"</p>` : ''}
+                    <small style="color: #999;">${request.created_at}</small>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button onclick="processRequest(${request.id}, 'accept')" class="btn" style="padding: 8px 16px;">
+                        Accept
+                    </button>
+                    <button onclick="processRequest(${request.id}, 'reject')" class="btn btn-danger" style="padding: 8px 16px;">
+                        Reject
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    document.querySelector('#pending-requests-container .card').innerHTML = `
+        <h3 style="color: #856404; margin-bottom: 1rem;">
+            💰 You have ${requests.length} pending money request(s)
+        </h3>
+        ${requestsHtml}
+    `;
+}
+
+function updateSentRequests(requests) {
+    const container = document.getElementById('sent-requests-list');
+    if (!container) return;
+
+    if (requests.length === 0) {
+        container.innerHTML = '<p style="color: #666; text-align: center; padding: 2rem;">No sent requests yet</p>';
+        return;
+    }
+
+    const requestsHtml = requests.map(request => `
+        <div style="padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+            <div>
+                <h5 style="margin: 0; color: #333;">${request.recipient_name}</h5>
+                <p style="margin: 0.25rem 0; color: #666;">৳${parseFloat(request.amount).toFixed(2)}</p>
+                <small style="color: #999;">${request.created_at}</small>
+            </div>
+            <div>
+                <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;
+                             background: ${request.status === 'pending' ? '#fff3cd; color: #856404;' :
+                                         request.status === 'accepted' ? '#d4edda; color: #155724;' :
+                                         '#f8d7da; color: #721c24;'}">
+                    ${request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                </span>
+            </div>
+        </div>
+    `).join('');
+
+    container.innerHTML = requestsHtml;
+}
+
+function updateRecentTransactions(transactions) {
+    const container = document.getElementById('recent-transactions-list');
+    if (!container) return;
+
+    if (transactions.length === 0) {
+        container.innerHTML = '<p style="color: #666; text-align: center; padding: 2rem;">No transactions yet</p>';
+        return;
+    }
+
+    const transactionsHtml = transactions.map(transaction => `
+        <div style="padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+            <div>
+                <h5 style="margin: 0; color: #333;">${transaction.description}</h5>
+                <small style="color: #999;">${transaction.created_at}</small>
+            </div>
+            <div style="font-weight: bold;
+                       color: ${transaction.transaction_type === 'credit' ? '#28a745' : '#dc3545'}">
+                ${transaction.transaction_type === 'credit' ? '+' : '-'}৳${parseFloat(transaction.amount).toFixed(2)}
+            </div>
+        </div>
+    `).join('');
+
+    container.innerHTML = transactionsHtml;
+}
+
+function processRequest(requestId, action) {
+    if (confirm(`Are you sure you want to ${action} this request?`)) {
+        // Stop auto-refresh during processing
+        stopAutoRefresh();
+
+        fetch('/process_request', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                request_id: requestId,
+                action: action
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                showNotification(data.message, 'success');
+                // Immediately refresh dashboard
+                refreshDashboard();
+                // Restart auto-refresh
+                startAutoRefresh();
+            } else {
+                showNotification(data.message || 'An error occurred', 'error');
+                startAutoRefresh();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('An error occurred while processing the request', 'error');
+            startAutoRefresh();
+        });
+    }
+}
+
+function showNotification(message, type) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'success' ? 'success' : 'error'} notification`;
+    notification.textContent = message;
+
+    document.body.appendChild(notification);
+
+    // Remove after 4 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.animation = 'slideIn 0.3s ease-out reverse';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }
+    }, 4000);
+}
+
+
+
+// Stop auto-refresh when user leaves the page
+window.addEventListener('beforeunload', stopAutoRefresh);
+</script>
+{% endblock %}

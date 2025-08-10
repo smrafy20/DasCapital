@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}Create Split Bill - DashCapital{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <div class="balance-display" style="margin-bottom: 2rem;">
+        <h3 style="margin-bottom: 0.5rem;">Your Balance</h3>
+        <div class="balance-amount">৳{{ "%.2f"|format(user.balance) }}</div>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-bottom: 1.5rem; text-align: center;">Create Split Bill</h2>
+
+        <form id="splitBillForm" method="POST">
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input id="title" name="title" placeholder="e.g., Dinner at Cafe 27" required />
+            </div>
+
+            <div class="form-group">
+                <label for="total_amount">Total Amount (BDT)</label>
+                <input type="number" id="total_amount" name="total_amount" step="0.01" min="0.01" required placeholder="Enter total bill amount" />
+            </div>
+
+            <div class="form-group">
+                <label for="note">Note (Optional)</label>
+                <textarea id="note" name="note" rows="3" placeholder="Add a note for this split bill..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="destination_phone">Destination Phone Number</label>
+                <input id="destination_phone" name="destination_phone" placeholder="Enter phone number who will receive the money" required />
+                <small style="color:#666; display:block; margin-top:4px;">All shares will be paid to this account</small>
+            </div>
+
+            <div class="form-group">
+                <label>Search and Select Participants</label>
+                <input type="text" id="userSearch" placeholder="Type user's name to search..." />
+                <div id="searchResults" style="display:none; border:1px solid #ddd; border-radius: 8px; max-height: 220px; overflow-y:auto; margin-top:6px;"></div>
+                <div id="selectedUsers" style="margin-top: 1rem; display:flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+                <input type="hidden" id="participants" name="participants" />
+            </div>
+
+            <div class="form-group">
+                <label>Split Mode</label>
+                <select id="split_mode" name="split_mode" onchange="updateSplitMode()">
+                    <option value="equal" selected>Equal Split</option>
+                    <option value="custom">Custom Split</option>
+                </select>
+            </div>
+
+            <div id="sharesContainer" class="form-group" style="display:none;"></div>
+            <input type="hidden" id="shares" name="shares" />
+
+            <div id="totalsRow" style="display:none; margin: 0.5rem 0; color:#555;"></div>
+
+            <button type="submit" id="submitBtn" class="btn" style="width:100%; margin-top: 1rem;" disabled>
+                <span id="submitBtnText">Create Split Bill</span>
+                <span id="submitBtnLoader" style="display:none;">Creating...</span>
+            </button>
+        </form>
+
+        <div style="text-align:center; margin-top: 1.5rem;">
+            <a href="{{ url_for('dashboard') }}" style="color:#667eea;">← Back to Dashboard</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let searchTimeout;
+let selectedUsers = []; // {id, name}
+let splitMode = 'equal';
+
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'success' ? 'success' : 'error'}`;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.zIndex = '9999';
+    notification.style.minWidth = '300px';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 3000);
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+    renderSelectedUsers();
+    onInputsChanged();
+    document.getElementById('title').addEventListener('input', onInputsChanged);
+    document.getElementById('destination_phone').addEventListener('input', onInputsChanged);
+});
+
+function renderSelectedUsers() {
+    const container = document.getElementById('selectedUsers');
+    if (selectedUsers.length === 0) {
+        container.innerHTML = '<div style="color:#666">No participants selected</div>';
+    } else {
+        container.innerHTML = selectedUsers.map(u => `
+            <span style="background:#eef; color:#334; padding:6px 10px; border-radius: 16px; display:inline-flex; gap:6px; align-items:center;">
+                ${u.name}
+                <button type="button" style="background:none; border:none; color:#c00; cursor:pointer;" onclick="removeUser(${u.id})">✕</button>
+            </span>
+        `).join('');
+    }
+    document.getElementById('participants').value = selectedUsers.map(u => u.id).join(',');
+    onInputsChanged();
+}
+
+function removeUser(id) {
+    selectedUsers = selectedUsers.filter(u => u.id !== id);
+    renderSelectedUsers();
+    renderSharesInputs();
+}
+
+document.getElementById('userSearch').addEventListener('input', function() {
+    const query = this.value.trim();
+    clearTimeout(searchTimeout);
+    if (query.length < 2) {
+        document.getElementById('searchResults').style.display = 'none';
+        return;
+    }
+    searchTimeout = setTimeout(() => {
+        fetch(`/search_users?q=${encodeURIComponent(query)}`)
+            .then(r => r.json())
+            .then(data => {
+                const resultsDiv = document.getElementById('searchResults');
+                const users = data.users || [];
+                if (users.length === 0) {
+                    resultsDiv.innerHTML = '<div style="padding:1rem; text-align:center; color:#666;">No users found</div>';
+                    resultsDiv.style.display = 'block';
+                    return;
+                }
+                resultsDiv.innerHTML = users.map(u => {
+                    const safeName = String(u.name).replace(/['\\]/g, '');
+                    return `
+                    <div onclick="selectUser(${u.id}, '${safeName}')"
+                        style="padding: 0.75rem 1rem; border-bottom:1px solid #eee; cursor:pointer;"
+                        onmouseover="this.style.backgroundColor='#f8f9fa'" onmouseout="this.style.backgroundColor='white'">
+                        <div style="font-weight:600; color:#333;">${safeName}</div>
+                        <div style="color:#666; font-size:0.9rem;">${u.phone_number}</div>
+                    </div>`;
+                }).join('');
+                resultsDiv.style.display = 'block';
+            })
+            .catch(err => console.error('Search error', err));
+    }, 300);
+});
+
+function selectUser(id, name) {
+    if (selectedUsers.some(u => u.id === id)) return;
+    selectedUsers.push({id, name});
+    document.getElementById('userSearch').value = '';
+    document.getElementById('searchResults').style.display = 'none';
+    renderSelectedUsers();
+    renderSharesInputs();
+}
+
+function updateSplitMode() {
+    splitMode = document.getElementById('split_mode').value;
+    renderSharesInputs();
+}
+
+function renderSharesInputs() {
+    const cont = document.getElementById('sharesContainer');
+    const totalsRow = document.getElementById('totalsRow');
+    const isCustom = splitMode === 'custom';
+    cont.style.display = isCustom ? 'block' : 'none';
+    totalsRow.style.display = isCustom ? 'block' : 'none';
+
+    if (!isCustom) {
+        document.getElementById('shares').value = '';
+        return;
+    }
+
+    const total = parseFloat(document.getElementById('total_amount').value || '0');
+    if (selectedUsers.length === 0) {
+        cont.innerHTML = '<div style="color:#666;">Select participants to assign custom shares</div>';
+        return;
+    }
+    cont.innerHTML = selectedUsers.map(u => `
+        <div class="form-group" style="margin-bottom:0.5rem;">
+            <label>${u.name}'s Share</label>
+            <input type="number" min="0.01" step="0.01" value="" id="share_${u.id}" oninput="onInputsChanged()" placeholder="0.00" />
+        </div>
+    `).join('');
+    onInputsChanged();
+}
+
+function onInputsChanged() {
+    const total = parseFloat(document.getElementById('total_amount').value || '0');
+    const btn = document.getElementById('submitBtn');
+    const title = document.getElementById('title').value.trim();
+    const destination = document.getElementById('destination_phone').value.trim();
+
+    if (splitMode === 'equal') {
+        const isValid = !!(title && total > 0 && selectedUsers.length > 0 && destination);
+        btn.disabled = !isValid;
+        console.log('Button state (equal):', { title, total, participants: selectedUsers.length, destination, disabled: btn.disabled }); // Debug
+        return;
+    }
+
+    // custom
+    let sum = 0;
+    let parts = [];
+    selectedUsers.forEach(u => {
+        const v = parseFloat((document.getElementById('share_' + u.id)?.value || '0')) || 0;
+        sum += v;
+        if (v > 0) parts.push(`${u.id}:${v.toFixed(2)}`);
+    });
+    document.getElementById('shares').value = parts.join(';');
+    document.getElementById('totalsRow').innerText = `Sum of shares: ৳${sum.toFixed(2)} / Total: ৳${total.toFixed(2)}`;
+
+    const destPhone = document.getElementById('destination_phone').value.trim();
+    btn.disabled = !(title && total > 0 && selectedUsers.length > 0 && Math.abs(sum - total) < 0.01 && destPhone);
+}
+
+document.getElementById('total_amount').addEventListener('input', onInputsChanged);
+
+document.getElementById('splitBillForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    console.log('Form submitted!'); // Debug log
+    const btn = document.getElementById('submitBtn');
+    const text = document.getElementById('submitBtnText');
+    const loader = document.getElementById('submitBtnLoader');
+    btn.disabled = true; text.style.display = 'none'; loader.style.display = 'inline';
+
+    const formData = {
+        title: document.getElementById('title').value.trim(),
+        total_amount: document.getElementById('total_amount').value,
+        note: document.getElementById('note').value,
+        split_mode: document.getElementById('split_mode').value,
+        participants: document.getElementById('participants').value,
+        shares: document.getElementById('shares').value,
+        destination_phone: document.getElementById('destination_phone').value.trim()
+    };
+    console.log('Form data:', formData); // Debug log
+    const form = new URLSearchParams(formData);
+
+    fetch('/split_bill', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form })
+        .then(r => {
+            console.log('Response status:', r.status); // Debug log
+            return r.text();
+        })
+        .then(txt => {
+            console.log('Response text:', txt.substring(0, 100)); // Debug log
+            if (txt.includes('Split bill')) {
+                showNotification('Split bill created successfully!', 'success');
+                document.getElementById('splitBillForm').reset();
+                selectedUsers = []; splitMode = 'equal';
+                document.getElementById('sharesContainer').style.display = 'none';
+                document.getElementById('totalsRow').style.display = 'none';
+                renderSelectedUsers();
+            } else {
+                showNotification('Failed to create split bill. Please try again.', 'error');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            showNotification('An error occurred while creating the split bill', 'error');
+        })
+        .finally(() => { btn.disabled = false; text.style.display = 'inline'; loader.style.display = 'none';});
+});
+
+// Hide search results when clicking outside
+
+document.addEventListener('click', function(event) {
+    const searchContainer = document.getElementById('userSearch').parentElement;
+    if (!searchContainer.contains(event.target)) {
+        document.getElementById('searchResults').style.display = 'none';
+    }
+});
+</script>
+{% endblock %}
+

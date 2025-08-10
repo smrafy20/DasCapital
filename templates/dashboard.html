@@ -12,12 +12,13 @@
             Account Type: {{ user.user_type.title() }} User
         </p>
     </div>
-    
+
     <!-- Quick Actions -->
     <div class="card" style="padding: 1.5rem;">
         <h3 style="margin-bottom: 1rem; color: #333;">Quick Actions</h3>
         <div style="display: flex; flex-direction: column; gap: 1rem;">
             <a href="{{ url_for('send_request') }}" class="btn">Send Money Request</a>
+            <a href="{{ url_for('split_bill') }}" class="btn">Create Split Bill</a>
         </div>
     </div>
 </div>
@@ -57,6 +58,35 @@
     </div>
 </div>
 
+<!-- Pending Split Bills -->
+<div id="pending-split-container" style="{% if not pending_split_shares %}display: none;{% endif %}">
+    <div class="card" style="background:#e2f7e2; border:1px solid #b6e6b6; margin-bottom: 2rem;">
+        <h3 style="color:#155724; margin-bottom:1rem;">🧾 Pending Split Bill Shares</h3>
+        <div id="pending-split-list">
+            {% if pending_split_shares %}
+                {% for share in pending_split_shares %}
+                <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #e9ecef;">
+                    <div style="display:flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h4 style="margin:0; color:#333;">{{ share.bill_title }}</h4>
+                            <p style="margin:0.25rem 0; color:#666;">Created by: {{ share.creator_name }}</p>
+                            <p style="margin:0.25rem 0; color:#007bff;">💰 Pay to: {{ share.destination_name or share.creator_name }}</p>
+                            <p style="margin:0.25rem 0; font-weight:bold; color:#28a745;">Your Share: ৳{{ "%.2f"|format(share.amount) }}</p>
+                            <small style="color:#999;">{{ share.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
+                        </div>
+                        <div style="display:flex; gap:0.5rem;">
+                            <button class="btn" style="padding:8px 16px; cursor:pointer;" onclick="console.log('Pay button clicked for share {{ share.id }}'); processSplitShare({{ share.id }}, 'pay')">Pay Share</button>
+                            <button class="btn btn-danger" style="padding:8px 16px; cursor:pointer;" onclick="console.log('Reject button clicked for share {{ share.id }}'); processSplitShare({{ share.id }}, 'reject')">Reject</button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+
 <!-- Recent Activity -->
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
     <!-- Sent Requests -->
@@ -86,7 +116,7 @@
             {% endif %}
         </div>
     </div>
-    
+
     <!-- Recent Transactions -->
     <div class="card">
         <h3 style="margin-bottom: 1rem; color: #333;">Recent Transactions</h3>
@@ -118,6 +148,14 @@ let updateInterval;
 
 // Start auto-refresh when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Dashboard loaded, testing processSplitShare function...');
+    if (typeof processSplitShare === 'function') {
+        console.log('✓ processSplitShare function is available');
+    } else {
+        console.log('✗ processSplitShare function is NOT available');
+    }
+    // Don't call refreshDashboard immediately - let server-side content work first
+    // refreshDashboard(); // Load data immediately
     startAutoRefresh();
 });
 
@@ -139,6 +177,7 @@ function refreshDashboard() {
             if (data.success) {
                 updateBalance(data.balance);
                 updatePendingRequests(data.pending_requests);
+                updatePendingSplitShares(data.pending_split_shares || []);
                 updateSentRequests(data.sent_requests);
                 updateRecentTransactions(data.recent_transactions);
             }
@@ -204,7 +243,12 @@ function updateSentRequests(requests) {
         return;
     }
 
-    const requestsHtml = requests.map(request => `
+    const requestsHtml = requests.map(request => {
+        let styleStr = '';
+        if (request.status === 'pending') styleStr = 'background:#fff3cd; color:#856404;';
+        else if (request.status === 'accepted') styleStr = 'background:#d4edda; color:#155724;';
+        else styleStr = 'background:#f8d7da; color:#721c24;';
+        return `
         <div style="padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
             <div>
                 <h5 style="margin: 0; color: #333;">${request.recipient_name}</h5>
@@ -212,17 +256,104 @@ function updateSentRequests(requests) {
                 <small style="color: #999;">${request.created_at}</small>
             </div>
             <div>
-                <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;
-                             background: ${request.status === 'pending' ? '#fff3cd; color: #856404;' :
-                                         request.status === 'accepted' ? '#d4edda; color: #155724;' :
-                                         '#f8d7da; color: #721c24;'}">
+                <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; ${styleStr}">
                     ${request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                 </span>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 
     container.innerHTML = requestsHtml;
+}
+
+function updatePendingSplitShares(shares) {
+    const container = document.getElementById('pending-split-container');
+    const list = document.getElementById('pending-split-list');
+    if (!container || !list) return;
+
+    if (!shares || shares.length === 0) {
+        container.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+
+    container.style.display = 'block';
+    // Clear the list first
+    list.innerHTML = '';
+
+    // Create elements for each share
+    shares.forEach(s => {
+        const shareDiv = document.createElement('div');
+        shareDiv.style.cssText = 'background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #e9ecef;';
+
+        shareDiv.innerHTML = `
+            <div style="display:flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h4 style="margin:0; color:#333;">${s.bill_title}</h4>
+                    <p style="margin:0.25rem 0; color:#666;">Created by: ${s.creator_name}</p>
+                    <p style="margin:0.25rem 0; color:#007bff;">💰 Pay to: ${s.destination_name || s.creator_name}</p>
+                    <p style="margin:0.25rem 0; font-weight:bold; color:#28a745;">Your Share: ৳${parseFloat(s.amount).toFixed(2)}</p>
+                    <small style="color:#999;">${s.created_at}</small>
+                </div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn pay-btn" style="padding:8px 16px; cursor:pointer;" data-share-id="${s.id}">Pay Share</button>
+                    <button class="btn btn-danger reject-btn" style="padding:8px 16px; cursor:pointer;" data-share-id="${s.id}">Reject</button>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners to buttons
+        const payBtn = shareDiv.querySelector('.pay-btn');
+        const rejectBtn = shareDiv.querySelector('.reject-btn');
+
+        payBtn.addEventListener('click', () => {
+            console.log('Pay button clicked for share', s.id);
+            processSplitShare(s.id, 'pay');
+        });
+
+        rejectBtn.addEventListener('click', () => {
+            console.log('Reject button clicked for share', s.id);
+            processSplitShare(s.id, 'reject');
+        });
+
+        list.appendChild(shareDiv);
+    });
+}
+
+function processSplitShare(shareId, action) {
+    console.log('processSplitShare called:', shareId, action); // Debug log
+    if (!confirm(`Are you sure you want to ${action} this share?`)) return;
+    console.log('User confirmed action'); // Debug log
+    stopAutoRefresh();
+    fetch('/process_split_share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ share_id: shareId, action })
+    })
+    .then(async r => {
+        console.log('Response status:', r.status);
+        const ct = r.headers.get('Content-Type') || '';
+        if (ct.includes('application/json')) return r.json();
+        const txt = await r.text();
+        console.warn('Non-JSON response:', txt.slice(0, 200));
+        return { success: false, message: 'Unexpected response from server' };
+    })
+    .then(data => {
+        console.log('Response data:', data);
+        if (data && data.success) {
+            showNotification(data.message, 'success');
+            refreshDashboard();
+        } else {
+            showNotification((data && data.message) || 'Failed to process share', 'error');
+        }
+        startAutoRefresh();
+    })
+    .catch(err => {
+        console.error('Error processing share:', err);
+        showNotification('An error occurred while processing the share', 'error');
+        startAutoRefresh();
+    });
 }
 
 function updateRecentTransactions(transactions) {

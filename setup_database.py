@@ -22,12 +22,12 @@ def create_database():
         
         with connection.cursor() as cursor:
             cursor.execute("CREATE DATABASE IF NOT EXISTS dashcapital")
-            print("✅ Database 'dashcapital' created successfully!")
+            # Database created successfully
         
         connection.close()
         
     except Exception as e:
-        print(f"❌ Error creating database: {e}")
+    # Error creating database
         return False
     
     return True
@@ -37,10 +37,10 @@ def create_tables():
     try:
         with app.app_context():
             db.create_all()
-            print("✅ All tables created successfully!")
+            # All tables created successfully
         return True
     except Exception as e:
-        print(f"❌ Error creating tables: {e}")
+    # Error creating tables
         return False
 
 # def create_sample_users():
@@ -49,8 +49,7 @@ def create_tables():
 #     return True
 
 def main():
-    print("🚀 Setting up DashCapital Database...")
-    print("=" * 50)
+    # Setting up DashCapital Database
     
     # Step 1: Create database
     if not create_database():
@@ -61,15 +60,14 @@ def main():
         return
     
     # Step 3: Ready for user registration
-    print("ℹ️  No sample users created - users can register through the application")
+    # No sample users created - users can register through the application
 
-    print("\n" + "=" * 50)
-    print("🎉 Database setup completed successfully!")
-    print("\n📝 Next steps:")
-    print("1. Run the application: python app.py")
-    print("2. Open http://localhost:5000 in your browser")
-    print("3. Register your first user account")
-    print("4. Start using the money request features!")
+    # Database setup completed successfully
+    # Next steps:
+    # 1. Run the application: python app.py
+    # 2. Open http://localhost:5000 in your browser
+    # 3. Register your first user account
+    # 4. Start using the money request features
 
 if __name__ == '__main__':
     main()

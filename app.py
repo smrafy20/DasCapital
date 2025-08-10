@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response, stream_with_context
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import DECIMAL, text, inspect
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import os
+import json
 from decimal import Decimal, ROUND_HALF_UP
 
 app = Flask(__name__)
@@ -284,6 +285,42 @@ def dashboard():
                          recent_transactions=recent_transactions,
                          sent_requests=sent_requests,
                          pending_split_shares=pending_split_shares)
+
+# In-memory per-session SSE queues (simple; non-persistent)
+from collections import defaultdict, deque
+sse_queues = defaultdict(lambda: deque(maxlen=100))
+
+def sse_push(user_id, event_type, payload):
+    try:
+        sse_queues[user_id].append({'type': event_type, 'data': payload})
+    except Exception as e:
+        print('sse_push warning:', e)
+
+@app.route('/events')
+def sse_events():
+    if 'user_id' not in session:
+        return Response('unauthorized', status=401)
+    user_id = session['user_id']
+
+    def event_stream(uid):
+        # Send an initial ping
+        yield 'event: ping\ndata: {}\n\n'
+        while True:
+            q = sse_queues.get(uid)
+            if q and len(q):
+                # drain queue
+                while True:
+                    try:
+                        evt = q.popleft()
+                    except IndexError:
+                        break
+                    yield f"event: {evt['type']}\ndata: {json.dumps(evt['data'])}\n\n"
+            # heartbeat to keep connection alive
+            yield 'event: ping\ndata: {}\n\n'
+            import time; time.sleep(5)
+
+    return Response(stream_with_context(event_stream(user_id)), mimetype='text/event-stream')
+
 
 @app.route('/dashboard_data')
 def dashboard_data():
@@ -595,6 +632,12 @@ def process_split_share():
             bill.completed_at = datetime.utcnow()
 
         db.session.commit()
+        # notify current user to refresh parts of dashboard
+        sse_push(user.id, 'dashboard-update', {'reason': f'split_share_{action}'})
+        # also notify creator/destination in case balances/transactions affect their view
+        sse_push(creator.id, 'dashboard-update', {'reason': f'split_share_{action}_other'})
+        if destination.id != creator.id:
+            sse_push(destination.id, 'dashboard-update', {'reason': f'split_share_{action}_dest'})
         msg = 'Share paid successfully' if action == 'pay' else 'Share rejected successfully'
         return jsonify({'success': True, 'message': msg})
 
@@ -653,6 +696,8 @@ def send_request():
         try:
             db.session.add(money_request)
             db.session.commit()
+            # notify recipient for real-time update
+            sse_push(recipient.id, 'dashboard-update', {'reason': 'money_request_received'})
 
             # Check if it's an AJAX request
             if request.headers.get('Content-Type') == 'application/x-www-form-urlencoded':

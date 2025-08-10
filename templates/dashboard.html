@@ -6,9 +6,12 @@
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
     <!-- Balance Display -->
     <div class="balance-display">
-        <h3 style="margin-bottom: 0.5rem;">Current Balance</h3>
+        <h3 style="margin-bottom: 0.25rem;">Current Balance</h3>
         <div class="balance-amount">৳{{ "%.2f"|format(user.balance) }}</div>
-        <p style="margin-top: 0.5rem; opacity: 0.9;">
+        <p style="margin-top: 0.5rem; opacity: 0.95; font-weight:600; color:#f8f9fa;">
+            {{ user.name }}
+        </p>
+        <p style="margin-top: 0.25rem; opacity: 0.9;">
             Account Type: {{ user.user_type.title() }} User
         </p>
     </div>
@@ -146,28 +149,42 @@
 <script>
 let updateInterval;
 
-// Start auto-refresh when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Dashboard loaded, testing processSplitShare function...');
+    console.log('Dashboard loaded');
     if (typeof processSplitShare === 'function') {
         console.log('✓ processSplitShare function is available');
-    } else {
-        console.log('✗ processSplitShare function is NOT available');
     }
-    // Don't call refreshDashboard immediately - let server-side content work first
-    // refreshDashboard(); // Load data immediately
-    startAutoRefresh();
+    setupRealtime();
 });
 
+function setupRealtime() {
+    try {
+        if (window.eventSource) {
+            window.eventSource.close();
+        }
+        const es = new EventSource('/events');
+        window.eventSource = es;
+        es.onopen = () => console.log('SSE connected');
+        es.onerror = (e) => console.warn('SSE error', e);
+        es.addEventListener('dashboard-update', (ev) => {
+            console.log('Event dashboard-update:', ev.data);
+            refreshDashboard();
+        });
+        es.addEventListener('ping', () => {
+            // heartbeat
+        });
+    } catch (e) {
+        console.warn('SSE setup failed, falling back to polling', e);
+        startAutoRefresh();
+    }
+}
+
 function startAutoRefresh() {
-    // Refresh every 5 seconds to reduce database pressure
     updateInterval = setInterval(refreshDashboard, 5000);
 }
 
 function stopAutoRefresh() {
-    if (updateInterval) {
-        clearInterval(updateInterval);
-    }
+    if (updateInterval) clearInterval(updateInterval);
 }
 
 function refreshDashboard() {

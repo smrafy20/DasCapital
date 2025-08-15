@@ -1,58 +1,42 @@
-# Python bytecode
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Environment variables
+*.pyo
+*.pyd
+*.pyc
+*.pyo
+*.pyd
+*.env
 .env
-.venv
-env/
 venv/
 ENV/
-env.bak/
-venv.bak/
+.env.*
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# VS Code
+.vscode/
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
+# Jupyter Notebooks
+.ipynb_checkpoints/
 
-# Log files
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
 
-# Local configuration
-instance/
-.webassets-cache
+# Database
+*.sqlite3
+*.db
 
-# IDE specific files
-.idea/
-.vscode/
+# Cookies
+cookies.txt
+
+# Misc
+*.bak
 *.swp
-*.swo
+*.tmp
 
-# Operating System Files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Static and templates (if generated)
+# static/
+# templates/

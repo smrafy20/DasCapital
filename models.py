@@ -56,3 +56,16 @@ class Notification(db.Model):
     message = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     read_at = db.Column(db.DateTime, nullable=True)
+
+
+class MoneyRequest(db.Model):
+    __tablename__ = 'money_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # requester
+    recipient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # payer
+    amount = db.Column(db.Float, nullable=False)
+    note = db.Column(db.String(255))
+    status = db.Column(db.String(20), default='pending', nullable=False)  # pending/accepted/rejected
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    processed_at = db.Column(db.DateTime)

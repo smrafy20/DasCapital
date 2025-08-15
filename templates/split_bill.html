@@ -218,7 +218,10 @@ function onInputsChanged() {
         if (v > 0) parts.push(`${u.id}:${v.toFixed(2)}`);
     });
     document.getElementById('shares').value = parts.join(';');
-    document.getElementById('totalsRow').innerText = `Sum of shares: ৳${sum.toFixed(2)} / Total: ৳${total.toFixed(2)}`;
+    const remaining = total - sum;
+    const remainingLabel = remaining >= 0 ? 'Remaining' : 'Over-allocated';
+    const remainingValue = Math.abs(remaining).toFixed(2);
+    document.getElementById('totalsRow').innerHTML = `Sum of shares: ৳${sum.toFixed(2)} / Total: ৳${total.toFixed(2)}<br><span style="color:${remaining >= 0 ? '#555' : '#c00'}">${remainingLabel}: ৳${remainingValue}</span>`;
 
     const destPhone = document.getElementById('destination_phone').value.trim();
     btn.disabled = !(title && total > 0 && selectedUsers.length > 0 && Math.abs(sum - total) < 0.01 && destPhone);

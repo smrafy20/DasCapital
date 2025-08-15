@@ -1,0 +1,48 @@
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: playfair display; }
+body {
+  background-image: url('https://i.postimg.cc/k4zVhP2t/MB-Home.png');
+  background-size: cover; background-position: 75% center; background-repeat: no-repeat;
+  background-color: #f5f5f5; color: #fff; min-height: 100vh;
+}
+html, body { height: 100%; }
+body { display: flex; flex-direction: column; }
+.main-content { flex: 1; display: flex; flex-direction: column; }
+
+.navbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; background-color: #0f2749; }
+.logo-btn { width: 100px; height: 40px; background-color: transparent; border: none; cursor: pointer; background-image: url('https://i.postimg.cc/nLt7Kfnk/Mobile-Banking-Logo.png'); background-size: contain; background-repeat: no-repeat; background-position: center; }
+
+/* center welcome area */
+.nav-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+.nav-center .welcome-text { color: #fff; font-weight: 700; font-size: 18px; line-height: 1.2; text-shadow: 0 0 6px rgba(0,0,0,0.3); }
+.nav-center .balance-text { color: #aac5ea; font-weight: 600; font-size: 14px; margin-top: 2px; }
+
+.nav-right { display: flex; gap: 8px; }
+.nav-right button { padding: 6px 10px; font-size: 12px; border: none; border-radius: 5px; background-color: #aac5ea; color: #000; font-weight: bold; cursor: pointer; }
+
+.main-content { padding: 20px; margin-top: 20px; display: flex; flex-direction: column; min-height: calc(100vh - 100px); }
+.button-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-top: 10px; flex-grow: 1; }
+.menu-button {
+  background-color: rgba(255, 255, 255, 0.9); color: #333; border: none; border-radius: 8px; padding: 8px 15px; font-size: 14px; font-weight: bold; text-align: center; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 8px #0f2749; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; position: relative; overflow: hidden; text-decoration: none;
+}
+.menu-button::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #3e75c2; background-size: contain; background-position: center; background-repeat: no-repeat; opacity: 0.2; z-index: 0; }
+.menu-button span { position: relative; z-index: 1; text-shadow: 0 0 5px rgba(255, 255, 255, 0.8); }
+.menu-button:hover { transform: translateY(-10px); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); }
+
+.faq-button { position: fixed; bottom: 15px; right: 15px; padding: 8px 12px; background-color: #aac5ea; color: black; font-weight: bold; border: none; border-radius: 15px; cursor: pointer; box-shadow: 0 4px 10px #0f2749; }
+
+/* Notifications dropdown */
+.notif-container { position: relative; }
+.notif-bell { position: relative; }
+.notif-dropdown { display: none; position: absolute; right: 0; top: 36px; z-index: 1000; width: 320px; background: #0f2749; color: #aac5ea; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); padding: 10px; }
+.notif-item { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.notif-item:last-child { border-bottom: none; }
+.notif-title { color: #fff; font-weight: 700; font-size: 14px; }
+.notif-message { font-size: 13px; }
+.notif-meta { font-size: 11px; opacity: 0.8; }
+.notif-footer { text-align: center; margin-top: 8px; }
+.notif-footer a { color: #aac5ea; text-decoration: underline; cursor: pointer; }
+
+/* Bell icon styling - match nav buttons */
+.notif-bell { background-color: #aac5ea; color: #000; border: none; border-radius: 5px; padding: 6px 10px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.notif-bell svg { fill: #000; display: block; }
+.notif-bell:hover { filter: brightness(0.95); }

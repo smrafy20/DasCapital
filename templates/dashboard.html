@@ -1,464 +1,293 @@
-{% extends "base.html" %}
-
-{% block title %}Dashboard - DashCapital{% endblock %}
-
-{% block content %}
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
-    <!-- Balance Display -->
-    <div class="balance-display">
-        <h3 style="margin-bottom: 0.25rem;">Current Balance</h3>
-        <div class="balance-amount">৳{{ "%.2f"|format(user.balance) }}</div>
-        <p style="margin-top: 0.5rem; opacity: 0.95; font-weight:600; color:#f8f9fa;">
-            {{ user.name }}
-        </p>
-        <p style="margin-top: 0.25rem; opacity: 0.9;">
-            Account Type: {{ user.user_type.title() }} User
-        </p>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="card" style="padding: 1.5rem;">
-        <h3 style="margin-bottom: 1rem; color: #333;">Quick Actions</h3>
-        <div style="display: flex; flex-direction: column; gap: 1rem;">
-            <a href="{{ url_for('send_request') }}" class="btn">Send Money Request</a>
-            <a href="{{ url_for('split_bill') }}" class="btn">Create Split Bill</a>
-        </div>
-    </div>
-</div>
-
-<!-- Pending Requests Notification -->
-<div id="pending-requests-container" style="{% if not pending_requests %}display: none;{% endif %}">
-    <div class="card" style="background: #fff3cd; border: 1px solid #ffeaa7; margin-bottom: 2rem;">
-        {% if pending_requests %}
-        <h3 style="color: #856404; margin-bottom: 1rem;">
-            💰 You have {{ pending_requests|length }} pending money request(s)
-        </h3>
-
-        {% for request in pending_requests %}
-        <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #e9ecef;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h4 style="margin: 0; color: #333;">{{ request.sender.name }}</h4>
-                    <p style="margin: 0.25rem 0; color: #666;">{{ request.sender.phone_number }}</p>
-                    <p style="margin: 0.25rem 0; font-weight: bold; color: #28a745;">Amount: ৳{{ "%.2f"|format(request.amount) }}</p>
-                    {% if request.note %}
-                    <p style="margin: 0.25rem 0; color: #666; font-style: italic;">"{{ request.note }}"</p>
-                    {% endif %}
-                    <small style="color: #999;">{{ request.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
-                </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button onclick="processRequest({{ request.id }}, 'accept')" class="btn" style="padding: 8px 16px;">
-                        Accept
-                    </button>
-                    <button onclick="processRequest({{ request.id }}, 'reject')" class="btn btn-danger" style="padding: 8px 16px;">
-                        Reject
-                    </button>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-        {% endif %}
-    </div>
-</div>
-
-<!-- Pending Split Bills -->
-<div id="pending-split-container" style="{% if not pending_split_shares %}display: none;{% endif %}">
-    <div class="card" style="background:#e2f7e2; border:1px solid #b6e6b6; margin-bottom: 2rem;">
-        <h3 style="color:#155724; margin-bottom:1rem;">🧾 Pending Split Bill Shares</h3>
-        <div id="pending-split-list">
-            {% if pending_split_shares %}
-                {% for share in pending_split_shares %}
-                <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #e9ecef;">
-                    <div style="display:flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <h4 style="margin:0; color:#333;">{{ share.bill_title }}</h4>
-                            <p style="margin:0.25rem 0; color:#666;">Created by: {{ share.creator_name }}</p>
-                            <p style="margin:0.25rem 0; color:#007bff;">💰 Pay to: {{ share.destination_name or share.creator_name }}</p>
-                            <p style="margin:0.25rem 0; font-weight:bold; color:#28a745;">Your Share: ৳{{ "%.2f"|format(share.amount) }}</p>
-                            <small style="color:#999;">{{ share.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
-                        </div>
-                        <div style="display:flex; gap:0.5rem;">
-                            <button class="btn" style="padding:8px 16px; cursor:pointer;" onclick="console.log('Pay button clicked for share {{ share.id }}'); processSplitShare({{ share.id }}, 'pay')">Pay Share</button>
-                            <button class="btn btn-danger" style="padding:8px 16px; cursor:pointer;" onclick="console.log('Reject button clicked for share {{ share.id }}'); processSplitShare({{ share.id }}, 'reject')">Reject</button>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-
-<!-- Recent Activity -->
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-    <!-- Sent Requests -->
-    <div class="card">
-        <h3 style="margin-bottom: 1rem; color: #333;">Recent Sent Requests</h3>
-        <div id="sent-requests-list">
-            {% if sent_requests %}
-                {% for request in sent_requests %}
-                <div style="padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
-                    <div>
-                        <h5 style="margin: 0; color: #333;">{{ request.recipient.name }}</h5>
-                        <p style="margin: 0.25rem 0; color: #666;">৳{{ "%.2f"|format(request.amount) }}</p>
-                        <small style="color: #999;">{{ request.created_at.strftime('%b %d, %Y') }}</small>
-                    </div>
-                    <div>
-                        <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;
-                                     background: {% if request.status == 'pending' %}#fff3cd; color: #856404;
-                                               {% elif request.status == 'accepted' %}#d4edda; color: #155724;
-                                               {% else %}#f8d7da; color: #721c24;{% endif %}">
-                            {{ request.status.title() }}
-                        </span>
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <p style="color: #666; text-align: center; padding: 2rem;">No sent requests yet</p>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Recent Transactions -->
-    <div class="card">
-        <h3 style="margin-bottom: 1rem; color: #333;">Recent Transactions</h3>
-        <div id="recent-transactions-list">
-            {% if recent_transactions %}
-                {% for transaction in recent_transactions %}
-                <div style="padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
-                    <div>
-                        <h5 style="margin: 0; color: #333;">{{ transaction.description }}</h5>
-                        <small style="color: #999;">{{ transaction.created_at.strftime('%b %d, %Y at %I:%M %p') }}</small>
-                    </div>
-                    <div style="font-weight: bold;
-                               color: {% if transaction.transaction_type == 'credit' %}#28a745{% else %}#dc3545{% endif %}">
-                        {% if transaction.transaction_type == 'credit' %}+{% else %}-{% endif %}৳{{ "%.2f"|format(transaction.amount) }}
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <p style="color: #666; text-align: center; padding: 2rem;">No transactions yet</p>
-            {% endif %}
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-let updateInterval;
-
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Dashboard loaded');
-    if (typeof processSplitShare === 'function') {
-        console.log('✓ processSplitShare function is available');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mobile Banking Home</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: playfair display;
     }
-    setupRealtime();
-});
 
-function setupRealtime() {
-    try {
-        if (window.eventSource) {
-            window.eventSource.close();
+    body {
+      background-image: url('https://i.postimg.cc/k4zVhP2t/MB-Home.png');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      background-color: #f5f5f5;
+      color: #fff;
+      min-height: 100vh;
+    }
+
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 25px;
+      background-color: #0f2749;
+    }
+
+	    /* center welcome area */
+	    .nav-center {
+	      position: absolute;
+	      left: 50%;
+	      top: 50%;
+	      transform: translate(-50%, -50%);
+	      text-align: center;
+	      pointer-events: none; /* do not block clicks on right buttons */
+	    }
+	    .nav-center .welcome-text {
+	      color: #fff;
+	      font-weight: 700;
+	      font-size: 18px;
+	      line-height: 1.2;
+	      text-shadow: 0 0 6px rgba(0,0,0,0.3);
+	    }
+	    .nav-center .balance-text {
+	      color: #aac5ea;
+	      font-weight: 600;
+	      font-size: 14px;
+	      margin-top: 2px;
+	    }
+
+    .logo-btn {
+      width: 100px;
+      height: 40px;
+      background-color: transparent;
+      border: none;
+      cursor: pointer;
+      background-image: url('https://i.postimg.cc/nLt7Kfnk/Mobile-Banking-Logo.png');
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+    }
+
+    .nav-right {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav-right button {
+      padding: 6px 10px;
+      font-size: 12px;
+      border: none;
+      border-radius: 5px;
+      background-color: #aac5ea;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .main-content {
+      padding: 20px;
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100vh - 100px);
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 25px;
+      margin-top: 10px;
+      flex-grow: 1;
+    }
+
+    .menu-button {
+      background-color: rgba(255, 255, 255, 0.9);
+      color: #333;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 15px;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 8px #0f2749;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100px;
+      position: relative;
+      overflow: hidden;
+      text-decoration: none;
+    }
+
+    .menu-button::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #3e75c2;
+      background-size: contain;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.2;
+      z-index: 0;
+    }
+
+    .menu-button span {
+      position: relative;
+      z-index: 1;
+      text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+    }
+
+    .menu-button:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .faq-button {
+      position: fixed;
+      bottom: 15px;
+      right: 15px;
+      padding: 8px 12px;
+      background-color: #aac5ea;
+      color: black;
+      font-weight: bold;
+      border: none;
+      border-radius: 15px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px #0f2749;
+    }
+
+    </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+
+  <nav class="navbar" style="position: relative;">
+    <button class="logo-btn" id="logoBtn"></button>
+
+    <div class="nav-center">
+      <div class="welcome-text">Welcome back, {{ name or 'User' }}!</div>
+      <div class="balance-text">Current balance: {{ '%.2f' % (balance or 0) }}</div>
+    </div>
+
+    <div class="nav-right">
+      <div class="notif-container">
+        <button id="notificationBtn" class="notif-bell" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2z"/>
+          </svg>
+        </button>
+        <div id="notifDropdown" class="notif-dropdown">
+          <div id="notifItems"></div>
+          <div class="notif-footer"><a href="{{ url_for('notifications.notifications_page') }}">See all</a></div>
+        </div>
+      </div>
+      <button id="profileBtn" onclick="window.location.href='{{ url_for('profile.profile') }}'">Profile</button>
+      <button id="favBtn" onclick="window.location.href='{{ url_for('payees.favourite_accounts') }}'">Favourite Accounts</button>
+      <button id="historyBtn">History</button>
+      <button id="logoutBtn">Log out</button>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <div class="button-grid">
+      <!-- Correct link to send_money route -->
+      <a href="/send_money" class="menu-button" style="--bg-image: url('send.png')"><span>Send Money</span></a>
+      <a href="/add_money" class="menu-button" style="--bg-image: url('add.png')"><span>Add Money</span></a>
+
+
+
+      <a href="/utility" class="menu-button" style="--bg-image: url('bills.png')"><span>Payment</span></a>
+      <a href="/investments" class="menu-button" style="--bg-image: url('invest.png')"><span>Investments</span></a>
+
+      <a href="/request_money" class="menu-button" style="--bg-image: url('request.png')"><span>Request Money From User</span></a>
+    </div>
+  </div>
+
+  <button class="faq-button" id="faqBtn">FAQ</button>
+  <button class="faq-button" id="contactBtn" style="right: 90px;">Contact Us</button> <!-- NEW -->
+
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('logoBtn').onclick = () => location.reload();
+      document.getElementById('profileBtn').onclick = () => window.location.href = "/profile";
+      document.getElementById('favBtn').onclick = () => window.location.href = "/favourite_accounts";
+      document.getElementById('historyBtn').onclick = () => window.location.href = "/statements";
+      document.getElementById('logoutBtn').onclick = () => window.location.href = "/logout";
+      document.getElementById('faqBtn').onclick = () => window.location.href = "/faq";
+      document.getElementById('contactBtn').onclick = () => window.location.href = "/user_messages";    // NEW
+
+
+    window.toggleNotifications = async function(e) {
+      e.stopPropagation();
+      const open = notifDropdown.style.display === 'block';
+      notifDropdown.style.display = open ? 'none' : 'block';
+      if (!open) {
+        await fetchLatestNotifications();
+        await markLatestAsRead();
+      }
+    }
+
+    // Notifications dropdown (clean)
+    const notifBtn = document.getElementById('notificationBtn');
+    const notifDropdown = document.getElementById('notifDropdown');
+    const notifItems = document.getElementById('notifItems');
+
+    async function fetchLatestNotifications() {
+      try {
+        const res = await fetch('/notifications/api/latest');
+        const data = await res.json();
+        notifItems.innerHTML = '';
+        if (!data.success || !data.notifications || data.notifications.length === 0) {
+          notifItems.innerHTML = '<div class="notif-item">No new notifications</div>';
+          return;
         }
-        const es = new EventSource('/events');
-        window.eventSource = es;
-        es.onopen = () => console.log('SSE connected');
-        es.onerror = (e) => console.warn('SSE error', e);
-        es.addEventListener('dashboard-update', (ev) => {
-            console.log('Event dashboard-update:', ev.data);
-            refreshDashboard();
+        data.notifications.forEach(n => {
+          const el = document.createElement('div');
+          el.className = 'notif-item';
+          el.innerHTML = `<div class="notif-title">${n.title}</div>
+                          <div class="notif-message">${n.message}</div>
+                          <div class="notif-meta">${n.created_at}</div>`;
+          notifItems.appendChild(el);
         });
-        es.addEventListener('ping', () => {
-            // heartbeat
-        });
-    } catch (e) {
-        console.warn('SSE setup failed, falling back to polling', e);
-        startAutoRefresh();
+      } catch (e) {
+        notifItems.innerHTML = '<div class="notif-item">Could not load notifications</div>';
+      }
     }
-}
 
-function startAutoRefresh() {
-    updateInterval = setInterval(refreshDashboard, 5000);
-}
-
-function stopAutoRefresh() {
-    if (updateInterval) clearInterval(updateInterval);
-}
-
-function refreshDashboard() {
-    fetch('/dashboard_data')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                updateBalance(data.balance);
-                updatePendingRequests(data.pending_requests);
-                updatePendingSplitShares(data.pending_split_shares || []);
-                updateSentRequests(data.sent_requests);
-                updateRecentTransactions(data.recent_transactions);
-            }
-        })
-        .catch(error => {
-            console.error('Error refreshing dashboard:', error);
+    async function markLatestAsRead() {
+      try {
+        await fetch('/notifications/api/mark_read', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mark_all: true })
         });
-}
-
-function updateBalance(balance) {
-    const balanceElement = document.querySelector('.balance-amount');
-    if (balanceElement) {
-        balanceElement.textContent = `৳${parseFloat(balance).toFixed(2)}`;
+      } catch (e) { /* ignore */ }
     }
-}
 
-function updatePendingRequests(requests) {
-    const container = document.getElementById('pending-requests-container');
-    if (!container) return;
-
-    if (requests.length === 0) {
-        container.style.display = 'none';
+    document.getElementById('notificationBtn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const open = notifDropdown.style.display === 'block';
+      if (open) {
+        notifDropdown.style.display = 'none';
         return;
-    }
-
-    container.style.display = 'block';
-    const requestsHtml = requests.map(request => `
-        <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #e9ecef;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h4 style="margin: 0; color: #333;">${request.sender_name}</h4>
-                    <p style="margin: 0.25rem 0; color: #666;">${request.sender_phone}</p>
-                    <p style="margin: 0.25rem 0; font-weight: bold; color: #28a745;">Amount: ৳${parseFloat(request.amount).toFixed(2)}</p>
-                    ${request.note ? `<p style="margin: 0.25rem 0; color: #666; font-style: italic;">"${request.note}"</p>` : ''}
-                    <small style="color: #999;">${request.created_at}</small>
-                </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button onclick="processRequest(${request.id}, 'accept')" class="btn" style="padding: 8px 16px;">
-                        Accept
-                    </button>
-                    <button onclick="processRequest(${request.id}, 'reject')" class="btn btn-danger" style="padding: 8px 16px;">
-                        Reject
-                    </button>
-                </div>
-            </div>
-        </div>
-    `).join('');
-
-    document.querySelector('#pending-requests-container .card').innerHTML = `
-        <h3 style="color: #856404; margin-bottom: 1rem;">
-            💰 You have ${requests.length} pending money request(s)
-        </h3>
-        ${requestsHtml}
-    `;
-}
-
-function updateSentRequests(requests) {
-    const container = document.getElementById('sent-requests-list');
-    if (!container) return;
-
-    if (requests.length === 0) {
-        container.innerHTML = '<p style="color: #666; text-align: center; padding: 2rem;">No sent requests yet</p>';
-        return;
-    }
-
-    const requestsHtml = requests.map(request => {
-        let styleStr = '';
-        if (request.status === 'pending') styleStr = 'background:#fff3cd; color:#856404;';
-        else if (request.status === 'accepted') styleStr = 'background:#d4edda; color:#155724;';
-        else styleStr = 'background:#f8d7da; color:#721c24;';
-        return `
-        <div style="padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
-            <div>
-                <h5 style="margin: 0; color: #333;">${request.recipient_name}</h5>
-                <p style="margin: 0.25rem 0; color: #666;">৳${parseFloat(request.amount).toFixed(2)}</p>
-                <small style="color: #999;">${request.created_at}</small>
-            </div>
-            <div>
-                <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; ${styleStr}">
-                    ${request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                </span>
-            </div>
-        </div>`;
-    }).join('');
-
-    container.innerHTML = requestsHtml;
-}
-
-function updatePendingSplitShares(shares) {
-    const container = document.getElementById('pending-split-container');
-    const list = document.getElementById('pending-split-list');
-    if (!container || !list) return;
-
-    if (!shares || shares.length === 0) {
-        container.style.display = 'none';
-        list.innerHTML = '';
-        return;
-    }
-
-    container.style.display = 'block';
-    // Clear the list first
-    list.innerHTML = '';
-
-    // Create elements for each share
-    shares.forEach(s => {
-        const shareDiv = document.createElement('div');
-        shareDiv.style.cssText = 'background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #e9ecef;';
-
-        shareDiv.innerHTML = `
-            <div style="display:flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h4 style="margin:0; color:#333;">${s.bill_title}</h4>
-                    <p style="margin:0.25rem 0; color:#666;">Created by: ${s.creator_name}</p>
-                    <p style="margin:0.25rem 0; color:#007bff;">💰 Pay to: ${s.destination_name || s.creator_name}</p>
-                    <p style="margin:0.25rem 0; font-weight:bold; color:#28a745;">Your Share: ৳${parseFloat(s.amount).toFixed(2)}</p>
-                    <small style="color:#999;">${s.created_at}</small>
-                </div>
-                <div style="display:flex; gap:0.5rem;">
-                    <button class="btn pay-btn" style="padding:8px 16px; cursor:pointer;" data-share-id="${s.id}">Pay Share</button>
-                    <button class="btn btn-danger reject-btn" style="padding:8px 16px; cursor:pointer;" data-share-id="${s.id}">Reject</button>
-                </div>
-            </div>
-        `;
-
-        // Add event listeners to buttons
-        const payBtn = shareDiv.querySelector('.pay-btn');
-        const rejectBtn = shareDiv.querySelector('.reject-btn');
-
-        payBtn.addEventListener('click', () => {
-            console.log('Pay button clicked for share', s.id);
-            processSplitShare(s.id, 'pay');
-        });
-
-        rejectBtn.addEventListener('click', () => {
-            console.log('Reject button clicked for share', s.id);
-            processSplitShare(s.id, 'reject');
-        });
-
-        list.appendChild(shareDiv);
+      }
+      // opening
+      notifDropdown.style.display = 'block';
+      // Always fetch fresh and render, including the "No new notifications" message
+      await fetchLatestNotifications();
+      // Mark all unread as read for simplicity
+      await markLatestAsRead();
     });
-}
 
-function processSplitShare(shareId, action) {
-    console.log('processSplitShare called:', shareId, action); // Debug log
-    if (!confirm(`Are you sure you want to ${action} this share?`)) return;
-    console.log('User confirmed action'); // Debug log
-    stopAutoRefresh();
-    fetch('/process_split_share', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ share_id: shareId, action })
-    })
-    .then(async r => {
-        console.log('Response status:', r.status);
-        const ct = r.headers.get('Content-Type') || '';
-        if (ct.includes('application/json')) return r.json();
-        const txt = await r.text();
-        console.warn('Non-JSON response:', txt.slice(0, 200));
-        return { success: false, message: 'Unexpected response from server' };
-    })
-    .then(data => {
-        console.log('Response data:', data);
-        if (data && data.success) {
-            showNotification(data.message, 'success');
-            refreshDashboard();
-        } else {
-            showNotification((data && data.message) || 'Failed to process share', 'error');
-        }
-        startAutoRefresh();
-    })
-    .catch(err => {
-        console.error('Error processing share:', err);
-        showNotification('An error occurred while processing the share', 'error');
-        startAutoRefresh();
+    // Close when clicking outside the dropdown
+    document.addEventListener('click', (evt) => {
+      const within = notifDropdown.contains(evt.target) || evt.target.id === 'notificationBtn';
+      if (!within) notifDropdown.style.display = 'none';
     });
-}
-
-function updateRecentTransactions(transactions) {
-    const container = document.getElementById('recent-transactions-list');
-    if (!container) return;
-
-    if (transactions.length === 0) {
-        container.innerHTML = '<p style="color: #666; text-align: center; padding: 2rem;">No transactions yet</p>';
-        return;
-    }
-
-    const transactionsHtml = transactions.map(transaction => `
-        <div style="padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
-            <div>
-                <h5 style="margin: 0; color: #333;">${transaction.description}</h5>
-                <small style="color: #999;">${transaction.created_at}</small>
-            </div>
-            <div style="font-weight: bold;
-                       color: ${transaction.transaction_type === 'credit' ? '#28a745' : '#dc3545'}">
-                ${transaction.transaction_type === 'credit' ? '+' : '-'}৳${parseFloat(transaction.amount).toFixed(2)}
-            </div>
-        </div>
-    `).join('');
-
-    container.innerHTML = transactionsHtml;
-}
-
-function processRequest(requestId, action) {
-    if (confirm(`Are you sure you want to ${action} this request?`)) {
-        // Stop auto-refresh during processing
-        stopAutoRefresh();
-
-        fetch('/process_request', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                request_id: requestId,
-                action: action
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Show success message
-                showNotification(data.message, 'success');
-                // Immediately refresh dashboard
-                refreshDashboard();
-                // Restart auto-refresh
-                startAutoRefresh();
-            } else {
-                showNotification(data.message || 'An error occurred', 'error');
-                startAutoRefresh();
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showNotification('An error occurred while processing the request', 'error');
-            startAutoRefresh();
-        });
-    }
-}
-
-function showNotification(message, type) {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `alert alert-${type === 'success' ? 'success' : 'error'} notification`;
-    notification.textContent = message;
-
-    document.body.appendChild(notification);
-
-    // Remove after 4 seconds
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.style.animation = 'slideIn 0.3s ease-out reverse';
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 300);
-        }
-    }, 4000);
-}
-
-
-
-// Stop auto-refresh when user leaves the page
-window.addEventListener('beforeunload', stopAutoRefresh);
-</script>
-{% endblock %}
+    });
+  </script>
+</body>
+</html>

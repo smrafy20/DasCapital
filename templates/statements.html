@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account Statements</title>
+  <style>
+    body { margin: 0; font-family: playfair display; background-color: #0f1c2e; color: #aac5ea; }
+    .navbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background-color: #0f2749; }
+    .logo-btn { width: 120px; height: 40px; background-color: transparent; border: none; cursor: pointer; background-image: url('https://i.postimg.cc/nLt7Kfnk/Mobile-Banking-Logo.png'); background-size: contain; background-repeat: no-repeat; background-position: center; }
+    .container { max-width: 1000px; margin: 20px auto; padding: 0 16px; }
+    .card { background-color: #0f2749; border-radius: 10px; padding: 16px; box-shadow: 0 0 8px rgba(0,0,0,0.5); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    th { color: #fff; }
+    td { color: #aac5ea; }
+    .buttons { margin-top: 12px; }
+    .btn { padding: 8px 12px; border: none; border-radius: 6px; background: #3e75c2; color: #fff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <button class="logo-btn" onclick="window.location.href='{{ url_for('dashboard.dashboard') }}'"></button>
+  </nav>
+
+  <div class="container">
+    <div class="card">
+      <h2 style="color:#fff;margin-top:0;">Account Statements</h2>
+      {% if transactions %}
+      <table>
+        <thead>
+          <tr>
+            <th>Transaction ID</th><th>Type</th><th>Amount</th><th>Method</th><th>Source/Destination</th><th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transactions %}
+          <tr>
+            <td>{{ t.trx_id }}</td>
+            <td>{{ t.type }}</td>
+            <td>{{ '%.2f' % t.amount }}</td>
+            <td>{{ t.method }}</td>
+            <td>{{ t.source_dest }}</td>
+            <td>{{ t.timestamp }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="buttons">
+        <a class="btn" href="{{ url_for('statements.download_statements') }}">Download CSV</a>
+      </div>
+      {% else %}
+      <div>No transactions found.</div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>
+

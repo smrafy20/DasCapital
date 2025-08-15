@@ -1,0 +1,6 @@
+Transaction ID,Type,Amount,Method,Source/Destination,Timestamp
+38935a2d,add,10000.0,bank,****1398,2025-08-09 06:29:08
+10df2610,send,500.0,wallet,01633718921,2025-08-09 08:23:34
+e57c613b,add,500.0,bank,****6486,2025-08-10 06:14:42
+7088b510,send,100.0,wallet,01633718921,2025-08-10 06:17:47
+e5a7ce1c,send,300.0,wallet,01633718921,2025-08-10 17:13:24

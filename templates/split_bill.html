@@ -130,7 +130,7 @@ document.getElementById('userSearch').addEventListener('input', function() {
         return;
     }
     searchTimeout = setTimeout(() => {
-        fetch(`/search_users?q=${encodeURIComponent(query)}`)
+        fetch(`/search_users?q=${encodeURIComponent(query)}&include_self=1`)
             .then(r => r.json())
             .then(data => {
                 const resultsDiv = document.getElementById('searchResults');

@@ -470,10 +470,10 @@ def split_bill():
             flash('Invalid participants list.', 'error')
             return render_template('split_bill.html', user=user)
 
-        # Remove duplicates and self
-        participant_ids = list(dict.fromkeys(pid for pid in participant_ids if pid != user.id))
+        # Remove duplicates only (self allowed)
+        participant_ids = list(dict.fromkeys(participant_ids))
         if not participant_ids:
-            flash('Please select at least one participant (other than yourself).', 'error')
+            flash('Please select at least one participant.', 'error')
             return render_template('split_bill.html', user=user)
 
         # Fetch participants and validate
@@ -725,11 +725,15 @@ def search_users():
     if len(query) < 2:
         return jsonify({'users': []})
 
-    current_user_id = session['user_id']
-    users = User.query.filter(
-        User.id != current_user_id,
-        User.name.ilike(f'%{query}%')
-    ).limit(10).all()
+    include_self = str(request.args.get('include_self', '')).lower() in ('1', 'true', 'yes')
+
+    base_q = User.query.filter(
+        User.name.ilike(f"%{query}%")
+    )
+    if not include_self and 'user_id' in session:
+        base_q = base_q.filter(User.id != session['user_id'])
+
+    users = base_q.limit(10).all()
 
     user_list = [{
         'id': user.id,

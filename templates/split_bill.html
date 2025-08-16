@@ -1,287 +1,135 @@
-{% extends "base.html" %}
-
-{% block title %}Create Split Bill - DashCapital{% endblock %}
-
-{% block content %}
-<div style="max-width: 800px; margin: 0 auto;">
-    <div class="balance-display" style="margin-bottom: 2rem;">
-        <h3 style="margin-bottom: 0.5rem;">Your Balance</h3>
-        <div class="balance-amount">৳{{ "%.2f"|format(user.balance) }}</div>
-    </div>
-
-    <div class="card">
-        <h2 style="margin-bottom: 1.5rem; text-align: center;">Create Split Bill</h2>
-
-        <form id="splitBillForm" method="POST">
-            <div class="form-group">
-                <label for="title">Title</label>
-                <input id="title" name="title" placeholder="e.g., Dinner at Cafe 27" required />
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Split Bill</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <style>
+    .page { max-width: 880px; margin: 18px auto; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    @media (max-width: 760px){ .grid2 { grid-template-columns: 1fr; } }
+    .form .row { margin-bottom: 12px; }
+    .form label { display:block; font-weight:600; margin-bottom:6px; color:#374151; }
+    .form input, .form textarea, .form select { width:100%; padding:10px; border:1px solid #e5e7eb; border-radius:8px; }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; background:#eef2ff; border:1px solid #e5e7eb; border-radius:999px; }
+    .pill .x { cursor:pointer; color:#6b7280; }
+    .sugg { display:none; border:1px solid #e5e7eb; border-radius:8px; background:#fff; box-shadow:0 8px 20px rgba(0,0,0,0.06); max-height:220px; overflow:auto; margin-top:6px; }
+    .sugg-item { padding:10px 12px; cursor:pointer; }
+    .sugg-item:hover { background:#f3f4f6; }
+    /* Ensure logo visibility */
+    .logo-btn { width: 120px; height: 40px; background-color: transparent; border: none; cursor: pointer; background-image: url('https://i.postimg.cc/nLt7Kfnk/Mobile-Banking-Logo.png'); background-size: contain; background-repeat: no-repeat; background-position: center; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <button class="logo-btn" onclick="window.location.href='{{ url_for('dashboard.dashboard') }}'"></button>
+    <div class="title">Split Bill</div>
+    <div class="nav-actions"></div>
+  </nav>
+  <div class="container page">
+    <div class="card"><div class="card-body">
+      <form id="splitForm" class="form" method="POST" action="{{ url_for('split.split_bill_page') }}">
+        <div class="grid2">
+          <div>
+            <div class="row"><label for="title">Title</label><input id="title" name="title" placeholder="e.g., Dinner at Cafe 27" required /></div>
+            <div class="row"><label for="total_amount">Total Amount (BDT)</label><input type="number" id="total_amount" name="total_amount" step="0.01" min="0.01" required /></div>
+            <div class="row"><label for="note">Note (optional)</label><textarea id="note" name="note" rows="3"></textarea></div>
+            <div class="row"><label for="destination_phone">Destination (Receiver) Phone</label><input id="destination_phone" name="destination_phone" placeholder="e.g., 017XXXXXXX" required /></div>
+          </div>
+          <div>
+            <div class="row"><label>Search and add participants</label>
+              <input id="userSearch" placeholder="Type a name or phone" />
+              <div id="sugg" class="sugg"></div>
+              <div id="selected" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px"></div>
+              <input type="hidden" id="participants" name="participants" />
             </div>
-
-            <div class="form-group">
-                <label for="total_amount">Total Amount (BDT)</label>
-                <input type="number" id="total_amount" name="total_amount" step="0.01" min="0.01" required placeholder="Enter total bill amount" />
+            <div class="row"><label for="split_mode">Split Mode</label>
+              <select id="split_mode" name="split_mode">
+                <option value="equal" selected>Equal Split</option>
+                <option value="custom">Custom Split</option>
+              </select>
             </div>
-
-            <div class="form-group">
-                <label for="note">Note (Optional)</label>
-                <textarea id="note" name="note" rows="3" placeholder="Add a note for this split bill..."></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="destination_phone">Destination Phone Number</label>
-                <input id="destination_phone" name="destination_phone" placeholder="Enter phone number who will receive the money" required />
-                <small style="color:#666; display:block; margin-top:4px;">All shares will be paid to this account</small>
-            </div>
-
-            <div class="form-group">
-                <label>Search and Select Participants</label>
-                <input type="text" id="userSearch" placeholder="Type user's name to search..." />
-                <div id="searchResults" style="display:none; border:1px solid #ddd; border-radius: 8px; max-height: 220px; overflow-y:auto; margin-top:6px;"></div>
-                <div id="selectedUsers" style="margin-top: 1rem; display:flex; flex-wrap: wrap; gap: 0.5rem;"></div>
-                <input type="hidden" id="participants" name="participants" />
-            </div>
-
-            <div class="form-group">
-                <label>Split Mode</label>
-                <select id="split_mode" name="split_mode" onchange="updateSplitMode()">
-                    <option value="equal" selected>Equal Split</option>
-                    <option value="custom">Custom Split</option>
-                </select>
-            </div>
-
-            <div id="sharesContainer" class="form-group" style="display:none;"></div>
+            <div id="sharesWrap" class="row" style="display:none"></div>
             <input type="hidden" id="shares" name="shares" />
-
-            <div id="totalsRow" style="display:none; margin: 0.5rem 0; color:#555;"></div>
-
-            <button type="submit" id="submitBtn" class="btn" style="width:100%; margin-top: 1rem;" disabled>
-                <span id="submitBtnText">Create Split Bill</span>
-                <span id="submitBtnLoader" style="display:none;">Creating...</span>
-            </button>
-        </form>
-
-        <div style="text-align:center; margin-top: 1.5rem;">
-            <a href="{{ url_for('dashboard') }}" style="color:#667eea;">← Back to Dashboard</a>
+            <div id="totals" class="row" style="display:none; color:#6b7280"></div>
+          </div>
         </div>
-    </div>
-</div>
-{% endblock %}
+        <button class="btn primary" id="submitBtn" type="submit" style="margin-top:8px">Create Split Bill</button>
+      </form>
+    </div></div>
+  </div>
 
-{% block scripts %}
-<script>
-let searchTimeout;
-let selectedUsers = []; // {id, name}
-let splitMode = 'equal';
+  <script>
+    // Suggestions
+    const input = document.getElementById('userSearch');
+    const sugg = document.getElementById('sugg');
+    const selected = document.getElementById('selected');
+    const participants = document.getElementById('participants');
+    const splitModeSel = document.getElementById('split_mode');
+    const sharesWrap = document.getElementById('sharesWrap');
+    const sharesHidden = document.getElementById('shares');
+    const totals = document.getElementById('totals');
 
+    let selectedUsers = []; // {id, name}
 
-function showNotification(message, type) {
-    const notification = document.createElement('div');
-    notification.className = `alert alert-${type === 'success' ? 'success' : 'error'}`;
-    notification.style.position = 'fixed';
-    notification.style.top = '20px';
-    notification.style.right = '20px';
-    notification.style.zIndex = '9999';
-    notification.style.minWidth = '300px';
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
-        }
-    }, 3000);
-}
-
-// Initialize on load
-document.addEventListener('DOMContentLoaded', () => {
-    renderSelectedUsers();
-    onInputsChanged();
-    document.getElementById('title').addEventListener('input', onInputsChanged);
-    document.getElementById('destination_phone').addEventListener('input', onInputsChanged);
-});
-
-function renderSelectedUsers() {
-    const container = document.getElementById('selectedUsers');
-    if (selectedUsers.length === 0) {
-        container.innerHTML = '<div style="color:#666">No participants selected</div>';
-    } else {
-        container.innerHTML = selectedUsers.map(u => `
-            <span style="background:#eef; color:#334; padding:6px 10px; border-radius: 16px; display:inline-flex; gap:6px; align-items:center;">
-                ${u.name}
-                <button type="button" style="background:none; border:none; color:#c00; cursor:pointer;" onclick="removeUser(${u.id})">✕</button>
-            </span>
-        `).join('');
-    }
-    document.getElementById('participants').value = selectedUsers.map(u => u.id).join(',');
-    onInputsChanged();
-}
-
-function removeUser(id) {
-    selectedUsers = selectedUsers.filter(u => u.id !== id);
-    renderSelectedUsers();
-    renderSharesInputs();
-}
-
-document.getElementById('userSearch').addEventListener('input', function() {
-    const query = this.value.trim();
-    clearTimeout(searchTimeout);
-    if (query.length < 2) {
-        document.getElementById('searchResults').style.display = 'none';
-        return;
-    }
-    searchTimeout = setTimeout(() => {
-        fetch(`/search_users?q=${encodeURIComponent(query)}&include_self=1`)
-            .then(r => r.json())
-            .then(data => {
-                const resultsDiv = document.getElementById('searchResults');
-                const users = data.users || [];
-                if (users.length === 0) {
-                    resultsDiv.innerHTML = '<div style="padding:1rem; text-align:center; color:#666;">No users found</div>';
-                    resultsDiv.style.display = 'block';
-                    return;
-                }
-                resultsDiv.innerHTML = users.map(u => {
-                    const safeName = String(u.name).replace(/['\\]/g, '');
-                    return `
-                    <div onclick="selectUser(${u.id}, '${safeName}')"
-                        style="padding: 0.75rem 1rem; border-bottom:1px solid #eee; cursor:pointer;"
-                        onmouseover="this.style.backgroundColor='#f8f9fa'" onmouseout="this.style.backgroundColor='white'">
-                        <div style="font-weight:600; color:#333;">${safeName}</div>
-                        <div style="color:#666; font-size:0.9rem;">${u.phone_number}</div>
-                    </div>`;
-                }).join('');
-                resultsDiv.style.display = 'block';
-            })
-            .catch(err => console.error('Search error', err));
-    }, 300);
-});
-
-function selectUser(id, name) {
-    if (selectedUsers.some(u => u.id === id)) return;
-    selectedUsers.push({id, name});
-    document.getElementById('userSearch').value = '';
-    document.getElementById('searchResults').style.display = 'none';
-    renderSelectedUsers();
-    renderSharesInputs();
-}
-
-function updateSplitMode() {
-    splitMode = document.getElementById('split_mode').value;
-    renderSharesInputs();
-}
-
-function renderSharesInputs() {
-    const cont = document.getElementById('sharesContainer');
-    const totalsRow = document.getElementById('totalsRow');
-    const isCustom = splitMode === 'custom';
-    cont.style.display = isCustom ? 'block' : 'none';
-    totalsRow.style.display = isCustom ? 'block' : 'none';
-
-    if (!isCustom) {
-        document.getElementById('shares').value = '';
-        return;
+    async function search(q){
+      if(!q||q.trim().length<1){ sugg.style.display='none'; return; }
+      const res = await fetch(`/search_users?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      const users = data.users || [];
+      sugg.innerHTML = users.length? users.map(u=>`<div class="sugg-item" onclick="addUser(${u.id}, '${String(u.name).replace(/["']/g,'')}' )">${u.name} (${u.phone||''})</div>`).join('') : '<div class="sugg-item">No matches</div>';
+      sugg.style.display='block';
     }
 
-    const total = parseFloat(document.getElementById('total_amount').value || '0');
-    if (selectedUsers.length === 0) {
-        cont.innerHTML = '<div style="color:#666;">Select participants to assign custom shares</div>';
-        return;
+    input.addEventListener('input', ()=> search(input.value));
+    document.addEventListener('click', (e)=>{ if(!sugg.contains(e.target) && e.target!==input) sugg.style.display='none'; });
+
+    function addUser(id, name){
+      if(selectedUsers.some(u=>u.id===id)) return;
+      selectedUsers.push({id, name});
+      renderSelected(); renderShares();
     }
-    cont.innerHTML = selectedUsers.map(u => `
-        <div class="form-group" style="margin-bottom:0.5rem;">
-            <label>${u.name}'s Share</label>
-            <input type="number" min="0.01" step="0.01" value="" id="share_${u.id}" oninput="onInputsChanged()" placeholder="0.00" />
-        </div>
-    `).join('');
-    onInputsChanged();
-}
-
-function onInputsChanged() {
-    const total = parseFloat(document.getElementById('total_amount').value || '0');
-    const btn = document.getElementById('submitBtn');
-    const title = document.getElementById('title').value.trim();
-    const destination = document.getElementById('destination_phone').value.trim();
-
-    if (splitMode === 'equal') {
-        const isValid = !!(title && total > 0 && selectedUsers.length > 0 && destination);
-        btn.disabled = !isValid;
-        console.log('Button state (equal):', { title, total, participants: selectedUsers.length, destination, disabled: btn.disabled }); // Debug
-        return;
+    function removeUser(id){ selectedUsers = selectedUsers.filter(u=>u.id!==id); renderSelected(); renderShares(); }
+    function renderSelected(){
+      participants.value = selectedUsers.map(u=>u.id).join(',');
+      selected.innerHTML = selectedUsers.map(u=>`<span class="pill">${u.name}<span class="x" onclick="removeUser(${u.id})">✕</span></span>`).join('');
     }
 
-    // custom
-    let sum = 0;
-    let parts = [];
-    selectedUsers.forEach(u => {
-        const v = parseFloat((document.getElementById('share_' + u.id)?.value || '0')) || 0;
-        sum += v;
-        if (v > 0) parts.push(`${u.id}:${v.toFixed(2)}`);
-    });
-    document.getElementById('shares').value = parts.join(';');
-    const remaining = total - sum;
-    const remainingLabel = remaining >= 0 ? 'Remaining' : 'Over-allocated';
-    const remainingValue = Math.abs(remaining).toFixed(2);
-    document.getElementById('totalsRow').innerHTML = `Sum of shares: ৳${sum.toFixed(2)} / Total: ৳${total.toFixed(2)}<br><span style="color:${remaining >= 0 ? '#555' : '#c00'}">${remainingLabel}: ৳${remainingValue}</span>`;
-
-    const destPhone = document.getElementById('destination_phone').value.trim();
-    btn.disabled = !(title && total > 0 && selectedUsers.length > 0 && Math.abs(sum - total) < 0.01 && destPhone);
-}
-
-document.getElementById('total_amount').addEventListener('input', onInputsChanged);
-
-document.getElementById('splitBillForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    console.log('Form submitted!'); // Debug log
-    const btn = document.getElementById('submitBtn');
-    const text = document.getElementById('submitBtnText');
-    const loader = document.getElementById('submitBtnLoader');
-    btn.disabled = true; text.style.display = 'none'; loader.style.display = 'inline';
-
-    const formData = {
-        title: document.getElementById('title').value.trim(),
-        total_amount: document.getElementById('total_amount').value,
-        note: document.getElementById('note').value,
-        split_mode: document.getElementById('split_mode').value,
-        participants: document.getElementById('participants').value,
-        shares: document.getElementById('shares').value,
-        destination_phone: document.getElementById('destination_phone').value.trim()
-    };
-    console.log('Form data:', formData); // Debug log
-    const form = new URLSearchParams(formData);
-
-    fetch('/split_bill', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form })
-        .then(r => {
-            console.log('Response status:', r.status); // Debug log
-            return r.text();
-        })
-        .then(txt => {
-            console.log('Response text:', txt.substring(0, 100)); // Debug log
-            if (txt.includes('Split bill')) {
-                showNotification('Split bill created successfully!', 'success');
-                document.getElementById('splitBillForm').reset();
-                selectedUsers = []; splitMode = 'equal';
-                document.getElementById('sharesContainer').style.display = 'none';
-                document.getElementById('totalsRow').style.display = 'none';
-                renderSelectedUsers();
-            } else {
-                showNotification('Failed to create split bill. Please try again.', 'error');
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            showNotification('An error occurred while creating the split bill', 'error');
-        })
-        .finally(() => { btn.disabled = false; text.style.display = 'inline'; loader.style.display = 'none';});
-});
-
-// Hide search results when clicking outside
-
-document.addEventListener('click', function(event) {
-    const searchContainer = document.getElementById('userSearch').parentElement;
-    if (!searchContainer.contains(event.target)) {
-        document.getElementById('searchResults').style.display = 'none';
+    function renderShares(){
+      const mode = splitModeSel.value;
+      if(selectedUsers.length===0){ sharesWrap.style.display='none'; totals.style.display='none'; sharesHidden.value=''; return; }
+      if(mode==='equal'){
+        sharesWrap.style.display='none';
+        totals.style.display='block';
+        const total = parseFloat(document.getElementById('total_amount').value||'0')||0;
+        const share = selectedUsers.length? total/selectedUsers.length : 0;
+        totals.textContent = `Each pays: ৳${share.toFixed(2)} (Total: ৳${total.toFixed(2)})`;
+        sharesHidden.value = '';
+      }else{
+        sharesWrap.style.display='block'; totals.style.display='block';
+        const total = parseFloat(document.getElementById('total_amount').value||'0')||0;
+        const rows = selectedUsers.map(u=>`<div class="row"><label>${u.name}</label><input type="number" min="0" step="0.01" id="share_${u.id}" oninput="onShareChange()" /></div>`).join('');
+        sharesWrap.innerHTML = rows;
+        onShareChange();
+      }
     }
-});
-</script>
-{% endblock %}
+
+    function onShareChange(){
+      const total = parseFloat(document.getElementById('total_amount').value||'0')||0;
+      let sum=0, parts=[];
+      selectedUsers.forEach(u=>{ const v=parseFloat((document.getElementById('share_'+u.id)?.value||'0'))||0; sum+=v; if(v>0) parts.push(`${u.id}:${v.toFixed(2)}`); });
+      sharesHidden.value = parts.join(';');
+      totals.textContent = `Sum of shares: ৳${sum.toFixed(2)} / Total: ৳${total.toFixed(2)}`;
+    }
+
+    splitModeSel.addEventListener('change', renderShares);
+    document.getElementById('total_amount').addEventListener('input', renderShares);
+
+  </script>
+  <div class="back-button-container">
+    <button class="back-button" onclick="location.href='{{ url_for('dashboard.dashboard') }}'">Back</button>
+  </div>
+</body>
+</html>
 

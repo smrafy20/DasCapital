@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Send Money Internationally - Mobile Banking</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
   <style>
     body {
       margin: 0;
@@ -101,8 +102,8 @@
 </head>
 <body>
   <!-- Navigation Bar -->
-  <nav>
-    <img src="https://i.postimg.cc/nLt7Kfnk/Mobile-Banking-Logo.png" alt="Logo" onclick="goHome()" />
+  <nav class="navbar">
+    <button class="logo-btn" onclick="window.location.href='{{ url_for('dashboard.dashboard') }}'"></button>
   </nav>
 
   <!-- Main Form -->
@@ -124,6 +125,9 @@
 	        <label for="recipientPhone">Recipient Phone (in-app)</label>
 	        <input type="text" id="recipientPhone" name="recipientPhone" placeholder="Enter recipient's phone" required>
 	      </div>
+      <!-- Autocomplete Suggestions -->
+      <div id="intlSuggestions" style="display:none; background:#fff; color:#000; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.2); position:absolute; width:300px; z-index:1000;"></div>
+
 
       <div class="form-group">
         <label for="country">Country</label>
@@ -153,7 +157,7 @@
     </form>
 
     <div class="back-button">
-      <button onclick="goBack()">Back</button>
+      <button onclick="window.location.href='{{ url_for('money.send_money_choice') }}'">Back</button>
     </div>
   </div>
 
@@ -241,6 +245,8 @@
         if (data.success) {
           window.location.href = '/int_money_confirm_transaction';
         } else {
+
+
           showError(data.message || 'Something went wrong. Please try again.');
         }
       })
@@ -249,6 +255,49 @@
         showError('Network error. Please try again later.');
       });
     }
+
+  <!-- Recipient autocomplete for international send (after main script) -->
+  <script>
+    (function(){
+      const phoneInput = document.getElementById('recipientPhone');
+      const sugg = document.getElementById('intlSuggestions');
+      function positionBox(){
+        const rect = phoneInput.getBoundingClientRect();
+        sugg.style.left = (rect.left + window.scrollX) + 'px';
+        sugg.style.top = (rect.bottom + window.scrollY) + 'px';
+      }
+      function render(list){
+        if (!list || list.length === 0){
+          sugg.innerHTML = '<div style="padding:8px 10px;">No matches</div>';
+          sugg.style.display = 'block';
+          return;
+        }
+        sugg.innerHTML = '';
+        list.forEach(u => {
+          const item = document.createElement('div');
+          item.style.padding = '8px 10px';
+          item.style.cursor = 'pointer';
+          item.onmouseenter = ()=> item.style.background = '#f2f2f2';
+          item.onmouseleave = ()=> item.style.background = 'transparent';
+          item.textContent = `${u.name} (${u.phone})`;
+          item.addEventListener('click', ()=>{ phoneInput.value = u.phone; sugg.style.display='none'; });
+          sugg.appendChild(item);
+        });
+        sugg.style.display = 'block';
+      }
+      async function search(q){
+        if (!q || q.trim().length < 1){ sugg.style.display='none'; return; }
+        try{
+          const res = await fetch(`/search_users?q=${encodeURIComponent(q)}`);
+          const data = await res.json();
+          if (!data.success) { sugg.style.display='none'; return; }
+          positionBox();
+          render(data.users);
+        }catch(e){ sugg.style.display='none'; }
+      }
+      phoneInput.addEventListener('input', ()=> search(phoneInput.value));
+      document.addEventListener('click', (e)=>{ if (!sugg.contains(e.target) && e.target !== phoneInput) sugg.style.display='none'; });
+    })();
   </script>
 </body>
 </html>

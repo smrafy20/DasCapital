@@ -6,6 +6,8 @@ def register_blueprints(app):
     from .payee_routes import payee_bp
     from .profile_routes import profile_bp
     from .notification_routes import notification_bp
+    from .request_routes import requests_bp
+    from .split_routes import split_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -14,3 +16,5 @@ def register_blueprints(app):
     app.register_blueprint(payee_bp)
     app.register_blueprint(profile_bp)
     app.register_blueprint(notification_bp)
+    app.register_blueprint(requests_bp)
+    app.register_blueprint(split_bp)

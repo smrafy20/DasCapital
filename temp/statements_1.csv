@@ -4,3 +4,6 @@ Transaction ID,Type,Amount,Method,Source/Destination,Timestamp
 e57c613b,add,500.0,bank,****6486,2025-08-10 06:14:42
 7088b510,send,100.0,wallet,01633718921,2025-08-10 06:17:47
 e5a7ce1c,send,300.0,wallet,01633718921,2025-08-10 17:13:24
+RQ2C,add,753.0,request,01633718921,2025-08-15 18:15:28
+RQ4C,add,300.0,request,01633718921,2025-08-15 19:22:35
+RQ5C,add,300.0,request,01633718921,2025-08-15 21:11:00

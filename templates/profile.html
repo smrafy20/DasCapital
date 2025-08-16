@@ -6,31 +6,25 @@
   <title>Profile</title>
   <style>
     * { box-sizing: border-box; font-family: playfair display; }
-    body { margin: 0; background-color: #0f1c2e; color: #aac5ea; }
-    .navbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background-color: #0f2749; }
-    .logo-btn { width: 120px; height: 40px; background-color: transparent; border: none; cursor: pointer; background-image: url('https://i.postimg.cc/nLt7Kfnk/Mobile-Banking-Logo.png'); background-size: contain; background-repeat: no-repeat; background-position: center; }
+    body { margin: 0; background: #f8fafc; color: #111827; }
+    .navbar { display:flex; justify-content:space-between; align-items:center; padding:15px 20px; background:#0f2749; }
+    .logo-btn { width:120px; height:40px; background-color:transparent; border:none; cursor:pointer; background-image:url('https://i.postimg.cc/nLt7Kfnk/Mobile-Banking-Logo.png'); background-size:contain; background-repeat:no-repeat; background-position:center; }
 
-    .container { max-width: 1000px; margin: 20px auto; padding: 0 16px; }
-    h1 { color: #fff; margin: 10px 0 16px; }
+    .container { max-width: 1000px; margin: 18px auto; padding: 0 16px; }
 
-    .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .grid { display:grid; grid-template-columns: 1fr; gap:16px; }
     @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
 
-    .card { background-color: #0f2749; border-radius: 10px; padding: 16px; box-shadow: 0 0 8px rgba(0,0,0,0.5); }
-    .card h2 { color: #fff; margin-top: 0; }
+    .card { background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; box-shadow:0 8px 24px rgba(0,0,0,0.06); }
+    .card h2 { color:#111827; margin-top:0; }
     .form-group { margin-bottom: 12px; }
-    .form-group label { display: block; margin-bottom: 6px; color: #aac5ea; }
-    .form-group input { width: 100%; padding: 10px; border: none; border-radius: 4px; background: #fff; color: #000; }
+    .form-group label { display:block; margin-bottom:6px; color:#374151; font-weight:700; }
+    .form-group input { width:100%; padding:10px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; color:#111827; }
 
-    .btn { padding: 10px 14px; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; }
-    .btn-primary { background: #3e75c2; color: #fff; }
+    .btn { padding: 10px 14px; border: none; border-radius: 8px; cursor: pointer; font-weight: 800; }
+    .btn-primary { background: #0f2749; color: #fff; }
 
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-    th { color: #fff; }
-    td { color: #aac5ea; }
-    .empty { padding: 10px; text-align: center; color: #aac5ea; }
-    .flash { color: #ffdfdf; background: rgba(255,0,0,0.15); padding: 10px; border: 1px solid rgba(255,0,0,0.3); border-radius: 6px; margin-bottom: 12px; }
+    .flash { color:#991b1b; background:#fee2e2; border:1px solid #fecaca; padding:10px; border-radius:8px; margin-bottom:12px; }
   </style>
 </head>
 <body>
@@ -39,8 +33,6 @@
   </nav>
 
   <div class="container">
-    <h1>Profile</h1>
-
     {% with messages = get_flashed_messages() %}
       {% if messages %}
         <div class="flash">{{ messages[0] }}</div>
@@ -48,8 +40,9 @@
     {% endwith %}
 
     <div class="grid">
+      <!-- Left: Profile Info -->
       <div class="card">
-        <h2>Profile Information</h2>
+        <h2>Your Details</h2>
         <form method="POST" action="{{ url_for('profile.update_profile') }}">
           <div class="form-group">
             <label for="first_name">First Name</label>
@@ -79,8 +72,9 @@
         </form>
       </div>
 
+      <!-- Right: Security -->
       <div class="card">
-        <h2>Change PIN</h2>
+        <h2>Security</h2>
         <form method="POST" action="{{ url_for('profile.change_pin') }}">
           <div class="form-group">
             <label for="current_pin">Current PIN</label>
@@ -99,7 +93,10 @@
       </div>
     </div>
 
-
+  </div>
+  <!-- Standard bottom-centered back button -->
+  <div class="back-button-container">
+    <button class="back-button" onclick="history.back()">Back</button>
   </div>
 </body>
 </html>

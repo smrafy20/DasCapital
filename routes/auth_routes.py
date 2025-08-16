@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from models import User
 from db import db
 from sqlalchemy.exc import IntegrityError
@@ -80,3 +80,47 @@ def signup():
         return redirect(url_for('auth.login'))
 
     return render_template('signup.html')
+
+# --- Forgot PIN (password) flow ---
+@auth_bp.route('/forgot_pin/verify', methods=['POST'])
+def forgot_pin_verify():
+    data = request.get_json(silent=True) or {}
+    phone = (data.get('phone') or '').strip()
+    nid = (data.get('nid') or '').strip()
+    if not phone or not nid:
+        return jsonify(success=False, message='Phone and NID are required.'), 400
+
+    user = User.query.filter_by(phone=phone, nid=nid).first()
+    if not user:
+        return jsonify(success=False, message='No user found with that Phone + NID.'), 404
+
+    # mark session for reset
+    session['reset_user_id'] = user.id
+    return jsonify(success=True)
+
+@auth_bp.route('/forgot_pin/reset', methods=['POST'])
+def forgot_pin_reset():
+    data = request.get_json(silent=True) or {}
+    new_pin = (data.get('new_pin') or '').strip()
+    confirm_pin = (data.get('confirm_pin') or '').strip()
+
+    user_id = session.get('reset_user_id')
+    if not user_id:
+        return jsonify(success=False, message='Reset session expired. Verify again.'), 400
+    if not new_pin or len(new_pin) < 4:
+        return jsonify(success=False, message='PIN must be at least 4 characters.'), 400
+    if new_pin != confirm_pin:
+        return jsonify(success=False, message='PINs do not match.'), 400
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify(success=False, message='User not found.'), 404
+
+    try:
+        user.pin = new_pin
+        db.session.commit()
+        session.pop('reset_user_id', None)
+        return jsonify(success=True)
+    except Exception:
+        db.session.rollback()
+        return jsonify(success=False, message='Could not update PIN.'), 500

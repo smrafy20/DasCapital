@@ -69,3 +69,29 @@ class MoneyRequest(db.Model):
     status = db.Column(db.String(20), default='pending', nullable=False)  # pending/accepted/rejected
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     processed_at = db.Column(db.DateTime)
+
+
+# --- Split Bill Models (inspired by Sadman module) ---
+class SplitBill(db.Model):
+    __tablename__ = 'split_bills'
+
+    id = db.Column(db.Integer, primary_key=True)
+    creator_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    destination_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # receiver of shares
+    title = db.Column(db.String(120), nullable=False)
+    note = db.Column(db.Text)
+    total_amount = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(20), default='open', nullable=False)  # open/completed/cancelled
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
+
+
+class SplitBillShare(db.Model):
+    __tablename__ = 'split_bill_shares'
+
+    id = db.Column(db.Integer, primary_key=True)
+    split_bill_id = db.Column(db.Integer, db.ForeignKey('split_bills.id'), nullable=False)
+    participant_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(20), default='pending', nullable=False)  # pending/paid/rejected
+    paid_at = db.Column(db.DateTime)

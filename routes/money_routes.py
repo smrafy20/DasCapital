@@ -226,11 +226,11 @@ def send_money_local():
             source_dest=recipient_phone
         )
 
-        # Notifications
+        # Notifications (use names/phones)
         db.session.add_all([
             trx,
-            Notification(user_id=sender.id, type='debit', title='Money Sent', message=f'Sent {amount:.2f} to {recipient_phone}'),
-            Notification(user_id=recipient.id, type='credit', title='Money Received', message=f'Received {amount:.2f} from {sender.phone}')
+            Notification(user_id=sender.id, type='debit', title='Money Sent', message=f'You sent {amount:.2f} to {recipient.full_name} ({recipient.phone})'),
+            Notification(user_id=recipient.id, type='credit', title='Money Received', message=f'{sender.full_name} ({sender.phone}) sent you {amount:.2f}')
         ])
         db.session.commit()
 
@@ -384,13 +384,41 @@ def confirm_send_money():
     # Add notifications and commit
     db.session.add_all([
         trx,
-        Notification(user_id=sender.id, type='debit', title='International Transfer', message=f'Sent {amount_bdt:.2f} BDT to {recipient.phone}')
+        Notification(user_id=sender.id, type='debit', title='International Transfer', message=f'You sent {amount_bdt:.2f} BDT to {recipient.full_name} ({recipient.phone})')
     ])
     # For the recipient, we also add a credit notification
-    db.session.add(Notification(user_id=recipient.id, type='credit', title='Money Received', message=f'Received {amount_bdt:.2f} BDT from {sender.phone}'))
+    db.session.add(Notification(user_id=recipient.id, type='credit', title='Money Received', message=f'{sender.full_name} ({sender.phone}) sent you {amount_bdt:.2f} BDT'))
     db.session.commit()
 
     # Clear pending
     session.pop('int_transfer', None)
 
     return jsonify(status='success', message='International transfer completed successfully.')
+
+# Search users by name or phone for autocomplete (exclude current user)
+@money_bp.route('/search_users', methods=['GET'])
+def search_users():
+    if 'user_id' not in session:
+        return jsonify(success=False, message='Not logged in'), 401
+
+    q = (request.args.get('q') or '').strip()
+    if len(q) < 1:
+        return jsonify(success=True, users=[])
+
+    from sqlalchemy import or_
+    current_id = session['user_id']
+    results = (User.query
+               .filter(User.id != current_id)
+               .filter(or_(User.full_name.ilike(f"%{q}%"), User.phone.ilike(f"%{q}%")))
+               .order_by(User.full_name.asc())
+               .limit(10)
+               .all())
+
+    users = [{
+        'id': u.id,
+        'name': u.full_name,
+        'phone': u.phone
+    } for u in results]
+
+    return jsonify(success=True, users=users)
+

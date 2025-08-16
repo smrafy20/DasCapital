@@ -167,10 +167,7 @@
   <nav class="navbar" style="position: relative;">
     <button class="logo-btn" id="logoBtn"></button>
 
-    <div class="nav-center">
-      <div class="welcome-text">Welcome back, {{ name or 'User' }}!</div>
-      <div class="balance-text">Current balance: {{ '%.2f' % (balance or 0) }}</div>
-    </div>
+
 
     <div class="nav-right">
       <div class="notif-container">
@@ -178,6 +175,7 @@
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2z"/>
           </svg>
+          <span id="notifBadge" class="notif-badge">0</span>
         </button>
         <div id="notifDropdown" class="notif-dropdown">
           <div id="notifItems"></div>
@@ -192,17 +190,43 @@
   </nav>
 
   <div class="main-content">
-    <div class="button-grid">
-      <!-- Correct link to send_money route -->
-      <a href="/send_money" class="menu-button" style="--bg-image: url('send.png')"><span>Send Money</span></a>
-      <a href="/add_money" class="menu-button" style="--bg-image: url('add.png')"><span>Add Money</span></a>
+    <!-- Balance card -->
+    <div class="cards-row" style="grid-template-columns: 1fr;">
+      <div class="balance-card" style="max-width:520px; margin: 0 auto; width:100%;">
+        <div class="balance-card-header">
+          <div class="greeting">Welcome back, {{ name or 'User' }}!</div>
+        </div>
+        <div class="balance-amount"><span class="currency">৳</span>{{ '%.2f' % (balance or 0) }}</div>
+        <div class="balance-sub">Current Balance</div>
+      </div>
+    </div>
 
-
-
-      <a href="/utility" class="menu-button" style="--bg-image: url('bills.png')"><span>Payment</span></a>
-      <a href="/investments" class="menu-button" style="--bg-image: url('invest.png')"><span>Investments</span></a>
-
-      <a href="/request_money" class="menu-button" style="--bg-image: url('request.png')"><span>Request Money From User</span></a>
+    <div class="button-grid" style="margin-top:16px;">
+      <a href="/send_money" class="menu-button">
+        <div class="menu-icon">⇄</div>
+        <div class="menu-title">Send Money</div>
+        <div class="menu-desc">Transfer funds quickly</div>
+      </a>
+      <a href="/add_money" class="menu-button">
+        <div class="menu-icon">＋</div>
+        <div class="menu-title">Add Money</div>
+        <div class="menu-desc">Top up via bank/card</div>
+      </a>
+      <a href="/request_money" class="menu-button">
+        <div class="menu-icon">↻</div>
+        <div class="menu-title">Request Money</div>
+        <div class="menu-desc">Ask a user to pay</div>
+      </a>
+      <a href="/split_bill" class="menu-button">
+        <div class="menu-icon">🧩</div>
+        <div class="menu-title">Split Bill</div>
+        <div class="menu-desc">Share a bill with friends</div>
+      </a>
+      <a href="/split_shares" class="menu-button">
+        <div class="menu-icon">🧾</div>
+        <div class="menu-title">My Split Shares</div>
+        <div class="menu-desc">Pay or reject your shares</div>
+      </a>
     </div>
   </div>
 
@@ -231,10 +255,11 @@
       }
     }
 
-    // Notifications dropdown (clean)
+    // Notifications dropdown
     const notifBtn = document.getElementById('notificationBtn');
     const notifDropdown = document.getElementById('notifDropdown');
     const notifItems = document.getElementById('notifItems');
+    const badge = document.getElementById('notifBadge');
 
     async function fetchLatestNotifications() {
       try {
@@ -248,6 +273,8 @@
         data.notifications.forEach(n => {
           const el = document.createElement('div');
           el.className = 'notif-item';
+          el.setAttribute('data-url', n.url || '');
+          el.style.cursor = n.url ? 'pointer' : 'default';
           el.innerHTML = `<div class="notif-title">${n.title}</div>
                           <div class="notif-message">${n.message}</div>
                           <div class="notif-meta">${n.created_at}</div>`;
@@ -258,35 +285,76 @@
       }
     }
 
-    async function markLatestAsRead() {
+    async function refreshUnreadBadge() {
       try {
-        await fetch('/notifications/api/mark_read', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mark_all: true })
-        });
+        const res = await fetch('/notifications/api/unread_count');
+        const data = await res.json();
+        if (!data.success || !badge) return;
+        const count = data.count || 0;
+        if (count > 0) {
+          badge.textContent = count > 9 ? '9+' : String(count);
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
       } catch (e) { /* ignore */ }
     }
 
-    document.getElementById('notificationBtn').addEventListener('click', async (e) => {
+    async function markLatestAsRead() {
+      try {
+        await fetch('/notifications/api/mark_read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mark_all: true })
+        });
+        await refreshUnreadBadge();
+      } catch (e) { /* ignore */ }
+    }
+
+    // Toggle dropdown, load latest, mark as read
+    notifBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const open = notifDropdown.style.display === 'block';
       if (open) {
         notifDropdown.style.display = 'none';
         return;
       }
-      // opening
       notifDropdown.style.display = 'block';
-      // Always fetch fresh and render, including the "No new notifications" message
       await fetchLatestNotifications();
-      // Mark all unread as read for simplicity
       await markLatestAsRead();
     });
 
-    // Close when clicking outside the dropdown
+    // Clicking an item with URL navigates
+    notifItems.addEventListener('click', (e) => {
+      const item = e.target.closest('.notif-item');
+      if (!item) return;
+      const url = item.getAttribute('data-url');
+      if (url) window.location.href = url;
+    });
+
+    // Balance eye toggle
+    (function(){
+      const btn = document.getElementById('toggleEye');
+      const val = document.getElementById('balVal');
+      if (!btn || !val) return;
+      const actual = val.textContent;
+      let hidden = false;
+      btn.addEventListener('click', () => {
+        hidden = !hidden;
+        btn.textContent = hidden ? 'Show' : 'Hide';
+        val.textContent = hidden ? '••••••' : actual;
+      });
+    })();
+
+    // Close when clicking outside
     document.addEventListener('click', (evt) => {
       const within = notifDropdown.contains(evt.target) || evt.target.id === 'notificationBtn';
       if (!within) notifDropdown.style.display = 'none';
     });
+
+    // Initial unread badge
+    refreshUnreadBadge();
+    setInterval(refreshUnreadBadge, 30000);
     });
   </script>
 </body>

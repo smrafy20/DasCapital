@@ -198,6 +198,10 @@
               value="{{ prefill_name or '' }}" required />
       </div>
 
+      <!-- Autocomplete Suggestions -->
+      <div id="suggestions" style="display:none; background:#fff; color:#000; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.2); position:absolute; width:calc(100% - 80px); max-width:400px; z-index:1000;"></div>
+
+
       <div class="form-group">
         <label for="amount">Amount</label>
         <input type="number" id="amount" name="amount" placeholder="Enter Amount" required />
@@ -263,6 +267,67 @@
         showPopup(message, false);
       }
     });
+
+
+	    // Autocomplete behavior for recipient search by name or phone
+	    (function(){
+	      const phoneInput = document.getElementById('recipient_phone');
+	      const nameInput = document.getElementById('recipient_name');
+	      const sugg = document.getElementById('suggestions');
+	      const form = document.getElementById('sendMoneyForm');
+
+	      function positionBox(anchor){
+	        const rect = anchor.getBoundingClientRect();
+	        sugg.style.left = (rect.left + window.scrollX + 40) + 'px';
+	        sugg.style.top = (rect.bottom + window.scrollY) + 'px';
+	      }
+
+	      function renderSuggestions(list){
+	        if (!list || list.length === 0){
+	          sugg.innerHTML = '<div style="padding:8px 10px;">No matches</div>';
+	          sugg.style.display = 'block';
+	          return;
+	        }
+	        sugg.innerHTML = '';
+	        list.forEach(u => {
+	          const item = document.createElement('div');
+	          item.style.padding = '8px 10px';
+	          item.style.cursor = 'pointer';
+	          item.onmouseenter = ()=> item.style.background = '#f2f2f2';
+	          item.onmouseleave = ()=> item.style.background = 'transparent';
+	          item.textContent = `${u.name} (${u.phone})`;
+	          item.addEventListener('click', () => {
+	            nameInput.value = u.name;
+	            phoneInput.value = u.phone;
+	            sugg.style.display = 'none';
+	          });
+	          sugg.appendChild(item);
+	        });
+	        sugg.style.display = 'block';
+	      }
+
+	      async function doSearch(q, anchor){
+	        if (!q || q.trim().length < 1){ sugg.style.display = 'none'; return; }
+	        try{
+	          const res = await fetch(`/search_users?q=${encodeURIComponent(q)}`);
+	          const data = await res.json();
+	          if (!data.success){ sugg.style.display = 'none'; return; }
+	          positionBox(anchor);
+	          renderSuggestions(data.users);
+	        } catch(e){
+	          sugg.style.display = 'none';
+	        }
+	      }
+
+	      phoneInput.addEventListener('input', () => doSearch(phoneInput.value, phoneInput));
+	      nameInput.addEventListener('input', () => doSearch(nameInput.value, nameInput));
+	      document.addEventListener('click', (e) => {
+	        if (!sugg.contains(e.target) && e.target !== phoneInput && e.target !== nameInput){
+	          sugg.style.display = 'none';
+	        }
+	      });
+	      form.addEventListener('submit', ()=> { sugg.style.display = 'none'; });
+	    })();
 
     function showPopup(message, isSuccess) {
       const popup = document.getElementById('popupModal');

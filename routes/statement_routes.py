@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, session, redirect, url_for, send_file
-from models import Transaction
+from models import Transaction, User
 import os
 import csv
 
@@ -11,9 +11,17 @@ def statements():
         return redirect(url_for('auth.login'))
 
     user_id = session['user_id']
-    transactions = Transaction.query.filter_by(user_id=user_id).order_by(Transaction.timestamp.desc()).all()
+    transactions = (Transaction.query
+                    .filter_by(user_id=user_id)
+                    .order_by(Transaction.timestamp.desc())
+                    .all())
 
-    return render_template('statements.html', transactions=transactions)
+    # Build a map of counterparty phones -> user (for friendly names)
+    phones = {str(t.source_dest).strip() for t in transactions if t.source_dest}
+    users = User.query.filter(User.phone.in_(phones)).all() if phones else []
+    users_by_phone = {u.phone: u for u in users}
+
+    return render_template('statements.html', transactions=transactions, users_by_phone=users_by_phone)
 
 @statement_bp.route('/statements/download')
 def download_statements():

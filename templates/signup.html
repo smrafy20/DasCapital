@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Signup - Mobile Banking</title>
+  <style>
+
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="left-section">
+      <img src="https://i.postimg.cc/nLt7Kfnk/Mobile-Banking-Logo.png" alt="Signup Image">
+      <h2>Let’s Make it Happen Together!</h2>
+    </div>
+    <div class="right-section">
+      <h1>Create An Account</h1>
+      <p>Already have an account? <a href="/login" style="color:#3e75c2; text-decoration: none;">Sign in here!</a></p>
+
+      <form id="signupForm" method="POST" action="/signup">
+        <input type="text" name="firstName" placeholder="First Name" required>
+        <input type="text" name="lastName" placeholder="Last Name" required>
+
+        <input type="email" name="email" placeholder="Email" required>
+        <div id="emailError" class="error-message" style="display: none;"></div>
+
+        <input type="text" name="phone" placeholder="Phone Number" required>
+        <div id="phoneError" class="error-message" style="display: none;"></div>
+
+        <input type="text" name="nid" placeholder="NID" required>
+        <input type="password" name="password" placeholder="Create Password" required>
+        <input type="date" name="dob" placeholder="Date of Birth" required>
+
+        <div class="checkbox">
+          <input type="checkbox" id="termsCheckbox" required>
+          <label for="termsCheckbox">Creating your account means you accept our <a href="#">Terms & Conditions</a>.</label>
+        </div>
+
+        <button type="submit" class="signup-btn" id="submitBtn" disabled>Create Account</button>
+        <button type="button" class="signup-btn" style="background-color: #ccc; color: #0f1c2e;" onclick="window.location.href='{{ url_for('auth.home') }}';">Back</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('signupForm');
+      const firstName = form.elements['firstName'];
+      const lastName = form.elements['lastName'];
+      const phone = form.elements['phone'];
+      const email = form.elements['email'];
+      const nid = form.elements['nid'];
+      const password = form.elements['password'];
+      const dob = form.elements['dob'];
+      const checkbox = document.getElementById('termsCheckbox');
+      const submitBtn = document.getElementById('submitBtn');
+
+      const phoneErrorDiv = document.getElementById('phoneError');
+      const emailErrorDiv = document.getElementById('emailError');
+
+      // Capitalize name inputs
+      const capitalizeLive = (input) => {
+        input.addEventListener('input', () => {
+          let val = input.value;
+          if (val.length > 0) {
+            input.value = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+          }
+        });
+      };
+      capitalizeLive(firstName);
+      capitalizeLive(lastName);
+
+      // Enforce digit-only input
+      const enforceDigitInput = (input, maxLength) => {
+        input.addEventListener('input', () => {
+          input.value = input.value.replace(/\D/g, '').slice(0, maxLength);
+        });
+      };
+      enforceDigitInput(nid, 10);
+
+      // Phone validation
+      phone.addEventListener('input', () => {
+        phone.value = phone.value.replace(/\D/g, '').slice(0, 11);
+        if (phone.value.length >= 2 && !phone.value.startsWith('01')) {
+          phoneErrorDiv.textContent = "Phone number must start with '01'.";
+          phoneErrorDiv.style.display = 'block';
+        } else {
+          phoneErrorDiv.textContent = "";
+          phoneErrorDiv.style.display = 'none';
+        }
+        validateForm();
+      });
+
+      // Email validation
+      email.addEventListener('input', () => {
+        if (email.value.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+          emailErrorDiv.textContent = "Invalid email address.";
+          emailErrorDiv.style.display = 'block';
+        } else {
+          emailErrorDiv.textContent = "";
+          emailErrorDiv.style.display = 'none';
+        }
+        validateForm();
+      });
+
+      // Validate form for enabling submit
+      const validateForm = () => {
+        const isValidPhone = /^01\d{9}$/.test(phone.value);
+        const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value);
+        const isValidNID = /^\d{10}$/.test(nid.value);
+        const isNameFilled = firstName.value.trim() && lastName.value.trim();
+        const isPasswordFilled = password.value.trim().length > 0;
+        const isDOBFilled = dob.value;
+        const isChecked = checkbox.checked;
+
+        if (isValidPhone && isValidEmail && isValidNID && isNameFilled && isPasswordFilled && isDOBFilled && isChecked) {
+          submitBtn.disabled = false;
+        } else {
+          submitBtn.disabled = true;
+        }
+      };
+
+      // Attach to all inputs
+      [firstName, lastName, nid, password, dob, checkbox].forEach(input => {
+        input.addEventListener('input', validateForm);
+      });
+      checkbox.addEventListener('change', validateForm);
+    });
+  </script>
+</body>
+</html>

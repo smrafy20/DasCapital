@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="$PROJECT_DIR$/config.py">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/config.py" />
+              <option name="originalContent" value="SECRET_KEY = 'your-secret-key'&#10;&#10;SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:mysql123@localhost/finance_app'&#10;SQLALCHEMY_TRACK_MODIFICATIONS = False&#10;" />
+              <option name="updatedContent" value="SECRET_KEY = 'your-secret-key'&#13;&#10;&#13;&#10;SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:1234@localhost/finance_app'&#13;&#10;SQLALCHEMY_TRACK_MODIFICATIONS = False" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+        <entry key="$PROJECT_DIR$/test_db_connection.py">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/test_db_connection.py" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

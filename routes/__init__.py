@@ -18,3 +18,4 @@ def register_blueprints(app):
     app.register_blueprint(notification_bp)
     app.register_blueprint(requests_bp)
     app.register_blueprint(split_bp)
+ 
